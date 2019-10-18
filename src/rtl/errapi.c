@@ -493,6 +493,16 @@ void hb_errExit( void )
    s_pError = NULL;
 }
 
+PHB_ITEM hb_errGet( void )
+{
+   hb_itemReturn( s_pError );
+}
+
+void hb_errSet( PHB_ITEM pError )
+{
+   hb_itemCopy( s_pError, pError );
+}
+
 PHB_ITEM hb_errNew( void )
 {
    HB_TRACE( HB_TR_DEBUG, ( "hb_errNew()" ) );
