@@ -678,13 +678,13 @@ HB_FUNC( HB_GETSTDERR ) /* Return handle for STDERR */
 
 HB_FUNC( HB_SETSTDOUT ) /* Set handle for STDOUT */
 {
-   s_hFilenoStdout := ( HB_FHANDLE ) hb_parnint( 1 );
+   s_hFilenoStdout = ( HB_FHANDLE ) hb_parnint( 1 );
    hb_ret();
 }
 
 HB_FUNC( HB_SETSTDERR ) /* Set handle for STDERR */
 {
-   s_hFilenoStderr := ( HB_FHANDLE ) hb_parnint( 1 );
+   s_hFilenoStderr = ( HB_FHANDLE ) hb_parnint( 1 );
    hb_ret();
 }
 
