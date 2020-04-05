@@ -481,8 +481,9 @@ void hb_errInit( void )
 
    /* Create error class and base object */
    s_pError = hb_itemNew( NULL );
-   hb_clsAssociate( hb_errClassCreate() );
-   hb_itemMove( s_pError, hb_stackReturnItem() );
+// hb_clsAssociate( hb_errClassCreate() );
+// hb_itemMove( s_pError, hb_stackReturnItem() );
+   hb_itemPutNInt( s_pError, (HB_MAXINT) hb_errClassCreate() );
 }
 
 void hb_errExit( void )
@@ -507,10 +508,15 @@ PHB_ITEM hb_errNew( void )
 {
    HB_TRACE( HB_TR_DEBUG, ( "hb_errNew()" ) );
 
-   if( ! s_pError || ! HB_IS_OBJECT( s_pError ) )
+// if( ! s_pError || ! HB_IS_OBJECT( s_pError ) )
+   if( ! s_pError || ! HB_IS_NUMINT( s_pError ) )
       hb_errInternal( HB_EI_ERRRECFAILURE, NULL, NULL, NULL );
 
-   return hb_arrayClone( s_pError );
+// return hb_arrayClone( s_pError );
+   PHB_ITEM pResult = hb_itemNew( NULL );
+   hb_clsAssociate( (HB_USHORT) hb_itemGetNInt( s_pError ) );
+   hb_itemMove( pResult, hb_stackReturnItem() );
+   return pResult;
 }
 
 HB_USHORT hb_errLaunch( PHB_ITEM pError )
