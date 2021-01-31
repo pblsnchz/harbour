@@ -1,0 +1,32 @@
+From b274e8df34ab4db9359c527947cc3e57b813eb63 Mon Sep 17 00:00:00 2001
+From: pblsnchz <pblsnchz@users.noreply.github.com>
+Date: Mon, 21 Oct 2019 09:48:14 +0200
+Subject: [PATCH] Fixed stupid typo.
+
+---
+ src/rtl/console.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/rtl/console.c b/src/rtl/console.c
+index caa6c89ac5..634b14eac3 100644
+--- a/src/rtl/console.c
++++ b/src/rtl/console.c
+@@ -678,13 +678,13 @@ HB_FUNC( HB_GETSTDERR ) /* Return handle for STDERR */
+ 
+ HB_FUNC( HB_SETSTDOUT ) /* Set handle for STDOUT */
+ {
+-   s_hFilenoStdout := ( HB_FHANDLE ) hb_parnint( 1 );
++   s_hFilenoStdout = ( HB_FHANDLE ) hb_parnint( 1 );
+    hb_ret();
+ }
+ 
+ HB_FUNC( HB_SETSTDERR ) /* Set handle for STDERR */
+ {
+-   s_hFilenoStderr := ( HB_FHANDLE ) hb_parnint( 1 );
++   s_hFilenoStderr = ( HB_FHANDLE ) hb_parnint( 1 );
+    hb_ret();
+ }
+ 
+-- 
+2.25.1
+

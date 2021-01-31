@@ -1,0 +1,33 @@
+From 8878aaccba659dae7bbe08a4583676e7cccfa5de Mon Sep 17 00:00:00 2001
+From: pblsnchz <pbl.snchz@gmail.com>
+Date: Fri, 18 Oct 2019 18:54:15 +0200
+Subject: [PATCH] Added functionality to set STDOUT/STDERR.
+
+---
+ src/rtl/console.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/src/rtl/console.c b/src/rtl/console.c
+index b7d8c1e700..caa6c89ac5 100644
+--- a/src/rtl/console.c
++++ b/src/rtl/console.c
+@@ -675,3 +675,16 @@ HB_FUNC( HB_GETSTDERR ) /* Return handle for STDERR */
+ {
+    hb_retnint( ( HB_NHANDLE ) s_hFilenoStderr );
+ }
++
++HB_FUNC( HB_SETSTDOUT ) /* Set handle for STDOUT */
++{
++   s_hFilenoStdout := ( HB_FHANDLE ) hb_parnint( 1 );
++   hb_ret();
++}
++
++HB_FUNC( HB_SETSTDERR ) /* Set handle for STDERR */
++{
++   s_hFilenoStderr := ( HB_FHANDLE ) hb_parnint( 1 );
++   hb_ret();
++}
++
+-- 
+2.25.1
+

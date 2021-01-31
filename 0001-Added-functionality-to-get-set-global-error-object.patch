@@ -1,0 +1,48 @@
+From 89c22cb849d55e37e6c16096553c864c3d493b7d Mon Sep 17 00:00:00 2001
+From: pblsnchz <pbl.snchz@gmail.com>
+Date: Fri, 18 Oct 2019 18:36:52 +0200
+Subject: [PATCH] Added functionality to get/set global error object.
+
+---
+ include/hbapierr.h |  3 +++
+ src/rtl/errapi.c   | 10 ++++++++++
+ 2 files changed, 13 insertions(+)
+
+diff --git a/include/hbapierr.h b/include/hbapierr.h
+index 68299a0182..ac50779094 100644
+--- a/include/hbapierr.h
++++ b/include/hbapierr.h
+@@ -127,6 +127,9 @@ extern HB_EXPORT void         hb_errRelease           ( PHB_ITEM pError );
+ extern void     hb_errInit              ( void );
+ extern void     hb_errExit              ( void );
+ 
++extern HB_EXPORT PHB_ITEM hb_errGet( void );
++extern HB_EXPORT void hb_errSet( PHB_ITEM pError );
++
+ extern HB_EXPORT PHB_ITEM  hb_errLaunchSubst( PHB_ITEM pError );
+ 
+ extern HB_EXPORT PHB_ITEM  hb_errRT_New( HB_USHORT uiSeverity,
+diff --git a/src/rtl/errapi.c b/src/rtl/errapi.c
+index 8da99f95be..12ca3de6d0 100644
+--- a/src/rtl/errapi.c
++++ b/src/rtl/errapi.c
+@@ -493,6 +493,16 @@ void hb_errExit( void )
+    s_pError = NULL;
+ }
+ 
++PHB_ITEM hb_errGet( void )
++{
++   hb_itemReturn( s_pError );
++}
++
++void hb_errSet( PHB_ITEM pError )
++{
++   hb_itemCopy( s_pError, pError );
++}
++
+ PHB_ITEM hb_errNew( void )
+ {
+    HB_TRACE( HB_TR_DEBUG, ( "hb_errNew()" ) );
+-- 
+2.25.1
+

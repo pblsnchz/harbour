@@ -1,0 +1,47 @@
+From 9898e5284388ade859564797bd8b246ae7037075 Mon Sep 17 00:00:00 2001
+From: pblsnchz <pbl.snchz@gmail.com>
+Date: Sun, 5 Apr 2020 15:41:11 +0200
+Subject: [PATCH] new: error object is now instantiated instead of cloned.     
+ This is to allow 3rd parties to install their own error object
+
+---
+ src/rtl/errapi.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/src/rtl/errapi.c b/src/rtl/errapi.c
+index 12ca3de6d0..eaa68138a5 100644
+--- a/src/rtl/errapi.c
++++ b/src/rtl/errapi.c
+@@ -481,8 +481,9 @@ void hb_errInit( void )
+ 
+    /* Create error class and base object */
+    s_pError = hb_itemNew( NULL );
+-   hb_clsAssociate( hb_errClassCreate() );
+-   hb_itemMove( s_pError, hb_stackReturnItem() );
++// hb_clsAssociate( hb_errClassCreate() );
++// hb_itemMove( s_pError, hb_stackReturnItem() );
++   hb_itemPutNInt( s_pError, (HB_MAXINT) hb_errClassCreate() );
+ }
+ 
+ void hb_errExit( void )
+@@ -507,10 +508,15 @@ PHB_ITEM hb_errNew( void )
+ {
+    HB_TRACE( HB_TR_DEBUG, ( "hb_errNew()" ) );
+ 
+-   if( ! s_pError || ! HB_IS_OBJECT( s_pError ) )
++// if( ! s_pError || ! HB_IS_OBJECT( s_pError ) )
++   if( ! s_pError || ! HB_IS_NUMINT( s_pError ) )
+       hb_errInternal( HB_EI_ERRRECFAILURE, NULL, NULL, NULL );
+ 
+-   return hb_arrayClone( s_pError );
++// return hb_arrayClone( s_pError );
++   PHB_ITEM pResult = hb_itemNew( NULL );
++   hb_clsAssociate( (HB_USHORT) hb_itemGetNInt( s_pError ) );
++   hb_itemMove( pResult, hb_stackReturnItem() );
++   return pResult;
+ }
+ 
+ HB_USHORT hb_errLaunch( PHB_ITEM pError )
+-- 
+2.25.1
+
