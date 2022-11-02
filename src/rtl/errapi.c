@@ -511,12 +511,25 @@ PHB_ITEM hb_errNew( void )
 // if( ! s_pError || ! HB_IS_OBJECT( s_pError ) )
    if( ! s_pError || ! HB_IS_NUMINT( s_pError ) )
       hb_errInternal( HB_EI_ERRRECFAILURE, NULL, NULL, NULL );
-
+#if 1
 // return hb_arrayClone( s_pError );
    PHB_ITEM pResult = hb_itemNew( NULL );
    hb_clsAssociate( (HB_USHORT) hb_itemGetNInt( s_pError ) );
    hb_itemMove( pResult, hb_stackReturnItem() );
+
    return pResult;
+#else
+   hb_vmPushSymbol( hb_dynsymGetSymbol( "HERROR" ) ); // we push the symbol of the function
+   hb_vmPushNil(); // we push nil for a function, a codeblock for Eval, an object for a method
+   hb_vmFunction( 0 ); // number of supplied parameters
+   PHB_ITEM pClass = hb_stackReturnItem();
+
+   hb_vmPushSymbol( hb_dynsymGetSymbol( "NEW" ) ); // we push the symbol of the method
+   hb_vmPush( pClass ); // we push the object
+   hb_vmSend( 0 ); // number of supplied parameters
+
+   return hb_stackReturnItem(); //pResult;
+#endif
 }
 
 HB_USHORT hb_errLaunch( PHB_ITEM pError )

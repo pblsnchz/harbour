@@ -175,10 +175,10 @@ char * hb_procname( int iLevel, char * szName, HB_BOOL fMethodName )
             hb_strncat( szName, hb_clsMethodName( pBase->item.asSymbol.stackstate->uiClass,
                                                   pBase->item.asSymbol.stackstate->uiMethod ), HB_PROCBUF_LEN );
          }
-         else if( HB_IS_BLOCK( pSelf ) )
+         else if( pSelf && HB_IS_BLOCK( pSelf ) && pSelf->item.asBlock.value && pSelf->item.asBlock.value->pDefSymb && pSelf->item.asBlock.value->pDefSymb->szName )
             hb_strncat( szName, pSelf->item.asBlock.value->pDefSymb->szName,
                         HB_PROCBUF_LEN );
-         else if( HB_IS_SYMBOL( pSelf ) )
+         else if( pSelf && HB_IS_SYMBOL( pSelf ) && pSelf->item.asSymbol.value && pSelf->item.asSymbol.value->szName )
             hb_strncpy( szName, pSelf->item.asSymbol.value->szName, HB_PROCBUF_LEN );
          else
             hb_strncat( szName, pBase->item.asSymbol.value->szName, HB_PROCBUF_LEN );

@@ -54,6 +54,7 @@
 #include "hbapifs.h"
 #include "hb_io.h"
 #include "hbtrace.h"
+#include "hbdate.h"
 
 #if defined( HB_OS_WIN )
    #include <windows.h>
@@ -320,23 +321,39 @@ static void hb_tracelog_( int level, const char * file, int line, const char * p
          }
 
          if( proc )
-            syslog( slevel, "%s:%d:%s() %s %s", file, line, proc,
-                    pszLevel, message );
+            syslog( slevel, "%-13s %35s:%-5d:%-35s %s", pszLevel, file, line, proc, message );
          else
-            syslog( slevel, "%s:%d: %s %s", file, line, pszLevel, message );
+            syslog( slevel, "%-13s %35s:%-5d: %s", pszLevel, file, line, message );
       }
 #  endif
 #endif
    }
-
+#if 1
+   char cDTFrm[ 27 ];
+   long lDate, lTime;
+   hb_timeStampGet( &lDate, &lTime );
+   hb_timeStampFormat( 
+      cDTFrm,
+      "YYYY-MM-DD",
+      "HH:MM:SS.FFF",
+      lDate,
+      lTime
+   );
+#endif
    /*
     * Print file and line.
     */
+#if 1
    if( proc )
-      fprintf( s_fp, "%s:%d:%s(): %s ", file, line, proc, pszLevel );
+      fprintf( s_fp, "%-13s %24s %35.35s:%-5d:%-35s ", pszLevel, cDTFrm, file, line, proc );
    else
-      fprintf( s_fp, "%s:%d: %s ", file, line, pszLevel );
-
+      fprintf( s_fp, "%-13s %24s %35.35s:%-5d: ", pszLevel, cDTFrm, file, line );
+#else
+   if( proc )
+      fprintf( s_fp, "%-13s %35.35s:%-5d:%-35s ", pszLevel, file, line, proc );
+   else
+      fprintf( s_fp, "%-13s %35.35s:%-5d: ", pszLevel, file, line );
+#endif
    /*
     * Print the name and arguments for the function.
     */
