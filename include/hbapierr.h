@@ -130,6 +130,8 @@ extern void     hb_errExit              ( void );
 extern HB_EXPORT PHB_ITEM hb_errGet( void );
 extern HB_EXPORT void hb_errSet( PHB_ITEM pError );
 
+//extern HB_EXPORT void      hb_errReinit( PHB_ITEM pError );
+
 extern HB_EXPORT PHB_ITEM  hb_errLaunchSubst( PHB_ITEM pError );
 
 extern HB_EXPORT PHB_ITEM  hb_errRT_New( HB_USHORT uiSeverity,

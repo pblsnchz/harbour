@@ -82,8 +82,10 @@ HB_FUNC_EXTERN( ERRORNEW );
 
 
 static PHB_ITEM s_pError = NULL;
+static HB_BOOL s_fErrInit = HB_FALSE;
 
 static HB_SYMB s_symErrorNew = { "ERRORNEW", { HB_FS_PUBLIC | HB_FS_LOCAL }, { HB_FUNCNAME( ERRORNEW ) }, NULL };
+static HB_SYMB s_symmsgInit = { "INIT", { HB_FS_MESSAGE }, { NULL }, NULL };
 
 typedef struct
 {
@@ -478,12 +480,20 @@ void hb_errInit( void )
 
    /* error function */
    hb_dynsymNew( &s_symErrorNew );
+   /* init message */
+   hb_dynsymNew( &s_symmsgInit );
 
    /* Create error class and base object */
    s_pError = hb_itemNew( NULL );
+#if 1
 // hb_clsAssociate( hb_errClassCreate() );
 // hb_itemMove( s_pError, hb_stackReturnItem() );
    hb_itemPutNInt( s_pError, (HB_MAXINT) hb_errClassCreate() );
+#else
+   hb_clsAssociate( hb_errClassCreate() );
+   hb_itemMove( s_pError, hb_stackReturnItem() );
+   s_fErrInit = hb_objHasMessage( s_pError, s_symmsgInit.pDynSym );
+#endif
 }
 
 void hb_errExit( void )
@@ -494,6 +504,7 @@ void hb_errExit( void )
    s_pError = NULL;
 }
 
+#if 1
 PHB_ITEM hb_errGet( void )
 {
    hb_itemReturn( s_pError );
@@ -502,10 +513,26 @@ PHB_ITEM hb_errGet( void )
 void hb_errSet( PHB_ITEM pError )
 {
    hb_itemCopy( s_pError, pError );
+#else
+void hb_errReinit( PHB_ITEM pError )
+{
+   if( pError && HB_IS_OBJECT( pError ) )
+   {
+      hb_itemRelease( s_pError );
+      s_pError = hb_itemNew( pError );
+   }
+   /* intentionaly outside above if() block so it can be called
+    * with NULL parameter just to refresh :Init() method status
+    * after class modification [druzus]
+    */
+   s_fErrInit = hb_objHasMessage( s_pError, s_symmsgInit.pDynSym );
+#endif
 }
 
 PHB_ITEM hb_errNew( void )
 {
+   PHB_ITEM pError;
+
    HB_TRACE( HB_TR_DEBUG, ( "hb_errNew()" ) );
 
 // if( ! s_pError || ! HB_IS_OBJECT( s_pError ) )
@@ -530,6 +557,21 @@ PHB_ITEM hb_errNew( void )
 
    return hb_stackReturnItem(); //pResult;
 #endif
+/*
+   pError = hb_arrayClone( s_pError );
+   if( s_fErrInit )
+   {
+      if( hb_vmRequestReenter() )
+      {
+         hb_vmPushSymbol( &s_symmsgInit );
+         hb_vmPush( pError );
+         hb_vmSend( 0 );
+         hb_vmRequestRestore();
+      }
+   }
+
+   return pError;
+*/
 }
 
 HB_USHORT hb_errLaunch( PHB_ITEM pError )
