@@ -485,15 +485,9 @@ void hb_errInit( void )
 
    /* Create error class and base object */
    s_pError = hb_itemNew( NULL );
-#if 1
-// hb_clsAssociate( hb_errClassCreate() );
-// hb_itemMove( s_pError, hb_stackReturnItem() );
-   hb_itemPutNInt( s_pError, (HB_MAXINT) hb_errClassCreate() );
-#else
    hb_clsAssociate( hb_errClassCreate() );
    hb_itemMove( s_pError, hb_stackReturnItem() );
    s_fErrInit = hb_objHasMessage( s_pError, s_symmsgInit.pDynSym );
-#endif
 }
 
 void hb_errExit( void )
@@ -504,16 +498,6 @@ void hb_errExit( void )
    s_pError = NULL;
 }
 
-#if 1
-PHB_ITEM hb_errGet( void )
-{
-   hb_itemReturn( s_pError );
-}
-
-void hb_errSet( PHB_ITEM pError )
-{
-   hb_itemCopy( s_pError, pError );
-#else
 void hb_errReinit( PHB_ITEM pError )
 {
    if( pError && HB_IS_OBJECT( pError ) )
@@ -526,7 +510,6 @@ void hb_errReinit( PHB_ITEM pError )
     * after class modification [druzus]
     */
    s_fErrInit = hb_objHasMessage( s_pError, s_symmsgInit.pDynSym );
-#endif
 }
 
 PHB_ITEM hb_errNew( void )
@@ -535,29 +518,9 @@ PHB_ITEM hb_errNew( void )
 
    HB_TRACE( HB_TR_DEBUG, ( "hb_errNew()" ) );
 
-// if( ! s_pError || ! HB_IS_OBJECT( s_pError ) )
-   if( ! s_pError || ! HB_IS_NUMINT( s_pError ) )
+   if( ! s_pError || ! HB_IS_OBJECT( s_pError ) )
       hb_errInternal( HB_EI_ERRRECFAILURE, NULL, NULL, NULL );
-#if 1
-// return hb_arrayClone( s_pError );
-   PHB_ITEM pResult = hb_itemNew( NULL );
-   hb_clsAssociate( (HB_USHORT) hb_itemGetNInt( s_pError ) );
-   hb_itemMove( pResult, hb_stackReturnItem() );
 
-   return pResult;
-#else
-   hb_vmPushSymbol( hb_dynsymGetSymbol( "HERROR" ) ); // we push the symbol of the function
-   hb_vmPushNil(); // we push nil for a function, a codeblock for Eval, an object for a method
-   hb_vmFunction( 0 ); // number of supplied parameters
-   PHB_ITEM pClass = hb_stackReturnItem();
-
-   hb_vmPushSymbol( hb_dynsymGetSymbol( "NEW" ) ); // we push the symbol of the method
-   hb_vmPush( pClass ); // we push the object
-   hb_vmSend( 0 ); // number of supplied parameters
-
-   return hb_stackReturnItem(); //pResult;
-#endif
-/*
    pError = hb_arrayClone( s_pError );
    if( s_fErrInit )
    {
@@ -571,7 +534,6 @@ PHB_ITEM hb_errNew( void )
    }
 
    return pError;
-*/
 }
 
 HB_USHORT hb_errLaunch( PHB_ITEM pError )
