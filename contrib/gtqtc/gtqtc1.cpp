@@ -66,7 +66,11 @@ static  HB_GT_FUNCS           SuperTable;
 #endif
 
 #ifdef HB_QT_NEEDLOCKS
-   static QMutex s_qMtx( QMutex::Recursive );
+#  if QT_VERSION >= 0x060000
+      static QRecursiveMutex s_qMtx;
+#  else
+      static QMutex s_qMtx( QMutex::Recursive );
+#  endif
 #  define HB_QTC_LOCK()       do { s_qMtx.lock()
 #  define HB_QTC_UNLOCK()     s_qMtx.unlock(); } while( 0 )
 #else
@@ -97,6 +101,8 @@ static void hb_gt_qtc_itemGetQString( PHB_ITEM pItem, QString * pqStr )
    {
 #if defined( HB_OS_WIN )
       * pqStr = QString::fromWCharArray( wStr, nSize );
+#elif QT_VERSION >= 0x060000
+      * pqStr = QString::fromUtf16( ( char16_t * ) wStr, nSize );
 #else
       * pqStr = QString::fromUtf16( wStr, nSize );
 #endif
@@ -1990,7 +1996,11 @@ static HB_BOOL hb_gt_qtc_mouse_ButtonState( PHB_GT pGT, int iButton )
       case 1:
          return ( QApplication::mouseButtons() & Qt::RightButton ) != 0;
       case 2:
+#if QT_VERSION >= 0x060000
+         return ( QApplication::mouseButtons() & Qt::MiddleButton ) != 0;
+#else
          return ( QApplication::mouseButtons() & Qt::MidButton ) != 0;
+#endif
    }
    return HB_FALSE;
 }
@@ -2140,11 +2150,41 @@ static HB_BOOL hb_gt_qtc_Info( PHB_GT pGT, int iType, PHB_GT_INFO pInfo )
 
       case HB_GTI_WINTITLE:
          pInfo->pResult = hb_gt_qtc_itemPutQString( pInfo->pResult, pQTC->wndTitle );
-         if( pInfo->pNewVal && HB_IS_STRING( pInfo->pNewVal ) )
+         if( pInfo->pNewVal )
          {
-            hb_gt_qtc_itemGetQString( pInfo->pNewVal, pQTC->wndTitle );
-            if( pQTC->qWnd )
-               pQTC->qWnd->setWindowTitle( *pQTC->wndTitle );
+            if( HB_IS_STRING( pInfo->pNewVal ) )
+            {
+               hb_gt_qtc_itemGetQString( pInfo->pNewVal, pQTC->wndTitle );
+               if( pQTC->qWnd )
+                  pQTC->qWnd->setWindowTitle( *pQTC->wndTitle );
+            }
+            else if( HB_IS_LOGICAL( pInfo->pNewVal ) )
+            {
+               pQTC->fNoFrame = hb_itemGetL( pInfo->pNewVal );
+               if( pQTC->qWnd )
+               {
+                  Qt::WindowFlags flags = Qt::CustomizeWindowHint;
+
+                  if( pQTC->fNoFrame )
+                  {
+                     hb_gt_qtc_setWindowFlags( pQTC, /*Qt::WindowTitleHint |
+                                                     Qt::WindowSystemMenuHint |*/
+                                                     Qt::WindowMinimizeButtonHint |
+                                                     Qt::WindowMaximizeButtonHint |
+                                                     Qt::WindowCloseButtonHint, HB_FALSE );
+                     flags |= Qt::FramelessWindowHint;
+                  }
+                  else
+                  {
+                     if( pQTC->iCloseMode < 2 )
+                        flags |= Qt::WindowCloseButtonHint;
+                     if( pQTC->fResizable )
+                        flags |= Qt::WindowMaximizeButtonHint;
+                     flags |= Qt::WindowMinimizeButtonHint;
+                  }
+                  hb_gt_qtc_setWindowFlags( pQTC, flags, pQTC->fNoFrame );
+               }
+            }
          }
          break;
 
@@ -3236,7 +3276,10 @@ void QTConsole::mouseMoveEvent( QMouseEvent * evt )
          update( QRegion( rSel1 ).xored( QRegion( rSel2 ) ) );
    }
    else
-      hb_gt_qtc_setMouseKey( pQTC, evt->x(), evt->y(), 0, evt->modifiers() );
+   {
+      QPoint pos = evt->pos();
+      hb_gt_qtc_setMouseKey( pQTC, pos.x(), pos.y(), 0, evt->modifiers() );
+   }
 }
 
 void QTConsole::wheelEvent( QWheelEvent * evt )
@@ -3297,7 +3340,11 @@ void QTConsole::mouseDoubleClickEvent( QMouseEvent * evt )
          iKey = K_RDBLCLK;
          break;
 
+#if QT_VERSION >= 0x060000
+      case Qt::MiddleButton:
+#else
       case Qt::MidButton:
+#endif
          iKey = K_MDBLCLK;
          break;
 
@@ -3306,7 +3353,8 @@ void QTConsole::mouseDoubleClickEvent( QMouseEvent * evt )
          return;
    }
 
-   hb_gt_qtc_setMouseKey( pQTC, evt->x(), evt->y(), iKey, evt->modifiers() );
+   QPoint pos = evt->pos();
+   hb_gt_qtc_setMouseKey( pQTC, pos.x(), pos.y(), iKey, evt->modifiers() );
 }
 
 void QTConsole::mousePressEvent( QMouseEvent * evt )
@@ -3318,8 +3366,10 @@ void QTConsole::mousePressEvent( QMouseEvent * evt )
       case Qt::LeftButton:
          if( ! selectMode && ( evt->modifiers() & Qt::ShiftModifier ) )
          {
+            QPoint pos = evt->pos();
+
             selectMode = true;
-            selectRect.setCoords( evt->x(), evt->y(), evt->x(), evt->y() );
+            selectRect.setCoords( pos.x(), pos.y(), pos.x(), pos.y() );
             update( hb_gt_qtc_unmapRect( pQTC, hb_gt_qtc_mapRect( pQTC, image, selectRect ) ) );
             return;
          }
@@ -3330,7 +3380,11 @@ void QTConsole::mousePressEvent( QMouseEvent * evt )
          iKey = K_RBUTTONDOWN;
          break;
 
+#if QT_VERSION >= 0x060000
+      case Qt::MiddleButton:
+#else
       case Qt::MidButton:
+#endif
          iKey = K_MBUTTONDOWN;
          break;
 
@@ -3339,7 +3393,8 @@ void QTConsole::mousePressEvent( QMouseEvent * evt )
          return;
    }
 
-   hb_gt_qtc_setMouseKey( pQTC, evt->x(), evt->y(), iKey, evt->modifiers() );
+   QPoint pos = evt->pos();
+   hb_gt_qtc_setMouseKey( pQTC, pos.x(), pos.y(), iKey, evt->modifiers() );
 }
 
 void QTConsole::mouseReleaseEvent( QMouseEvent * evt )
@@ -3361,7 +3416,11 @@ void QTConsole::mouseReleaseEvent( QMouseEvent * evt )
          iKey = K_RBUTTONUP;
          break;
 
+#if QT_VERSION >= 0x060000
+      case Qt::MiddleButton:
+#else
       case Qt::MidButton:
+#endif
          iKey = K_MBUTTONUP;
          break;
 
@@ -3370,7 +3429,8 @@ void QTConsole::mouseReleaseEvent( QMouseEvent * evt )
          return;
    }
 
-   hb_gt_qtc_setMouseKey( pQTC, evt->x(), evt->y(), iKey, evt->modifiers() );
+   QPoint pos = evt->pos();
+   hb_gt_qtc_setMouseKey( pQTC, pos.x(), pos.y(), iKey, evt->modifiers() );
 }
 
 bool QTConsole::event( QEvent * evt )
@@ -3793,14 +3853,21 @@ QTCWindow::QTCWindow( PHB_GTQTC pQTC )
 {
    Qt::WindowFlags flags = ( windowFlags() & Qt::WindowType_Mask ) |
                            Qt::CustomizeWindowHint                 |
-                           Qt::WindowMinimizeButtonHint            |
-                           Qt::WindowSystemMenuHint                |
-                           Qt::WindowTitleHint                     |
                            Qt::Window;
-   if( pQTC->iCloseMode < 2 )
-      flags |= Qt::WindowCloseButtonHint;
-   if( pQTC->fResizable )
-      flags |= Qt::WindowMaximizeButtonHint;
+   if( pQTC->fNoFrame )
+   {
+      flags |= Qt::FramelessWindowHint;
+   }
+   else
+   {
+      if( pQTC->iCloseMode < 2 )
+         flags |= Qt::WindowCloseButtonHint;
+      if( pQTC->fResizable )
+         flags |= Qt::WindowMaximizeButtonHint;
+      flags |= Qt::WindowMinimizeButtonHint |
+               Qt::WindowSystemMenuHint |
+               Qt::WindowTitleHint;
+   }
 
    setWindowFlags( flags );
 

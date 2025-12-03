@@ -217,7 +217,7 @@ HB_FUNC( HB_VFCOPYFILE )
    hb_retni( iResult );
 }
 
-/* hb_vfCopyFile( <cFileSrc>, <cFileDst>, [<nBufSize>], [<lTimePreserve>=.t.], [<bCallBack>] ) --> <nResult> */
+/* hb_vfCopyFileEx( <cFileSrc>, <cFileDst>, [<nBufSize>], [<lTimePreserve>=.t.], [<bCallBack>] ) --> <nResult> */
 HB_FUNC( HB_VFCOPYFILEEX )
 {
    const char * pszSource = hb_parc( 1 ),
@@ -910,8 +910,24 @@ HB_FUNC( HB_VFLOAD )
    {
       HB_SIZE nSize;
       char * pBuffer = ( char * ) hb_fileLoad( pszFileName, hb_parns( 2 ), &nSize );
+      hb_fsSetFError( hb_fsError() );
       if( pBuffer )
          hb_retclen_buffer( pBuffer, nSize );
+   }
+   else
+      hb_errRT_BASE_SubstR( EG_ARG, 2021, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+}
+
+/* hb_vfSave(  <cFileName>, <cFileBody> ) --> <lOK> */
+HB_FUNC( HB_VFSAVE )
+{
+   const char * pszFileName = hb_parc( 1 );
+   const char * pszFileBody = hb_parc( 2 );
+
+   if( pszFileName && pszFileBody )
+   {
+      hb_retl( hb_fileSave( pszFileName, pszFileBody, hb_parclen( 2 ) ) );
+      hb_fsSetFError( hb_fsError() );
    }
    else
       hb_errRT_BASE_SubstR( EG_ARG, 2021, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );

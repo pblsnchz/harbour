@@ -135,7 +135,7 @@
      5. If HB_COMPILER is not set,
         use the highest one on the priority list.
      NOTES: - Priority list: HB_CCPATH, PATH, embedded.
-            - Priority list: mingw, msvc, bcc, watcom, pocc, xcc
+            - Priority list: mingw, clang, msvc, bcc, watcom, pocc, xcc
             - Compilers of native CPU target have higher priority. (extra)
               On x86_64 Windows: msvc64, msvc, msvcia64, mingw64, mingw, ...
               On x86 Windows: msvc, msvc64, msvcia64, mingw, mingw64, ...
@@ -165,7 +165,7 @@ EXTERNAL HB_GT_CGI_DEFAULT
    EXTERNAL HB_GT_DOS
 #elif defined( __PLATFORM__OS2 )
    EXTERNAL HB_GT_OS2
-#elif defined( __PLATFORM__UNIX ) .AND. ! defined( __PLATFORM__VXWORKS ) .AND. ! defined( __PLATFORM__SYMBIAN )
+#elif defined( __PLATFORM__UNIX ) .AND. ! defined( __PLATFORM__WASM ) .AND. ! defined( __PLATFORM__VXWORKS ) .AND. ! defined( __PLATFORM__SYMBIAN )
    EXTERNAL HB_GT_TRM
    #if defined( HBMK_WITH_GTXWC )
       EXTERNAL HB_GT_XWC
@@ -180,6 +180,8 @@ EXTERNAL hbmk_KEYW
 #ifndef HB_SYMBOL_UNUSED
 #define HB_SYMBOL_UNUSED( symbol )  ( ( symbol ) )
 #endif
+
+#xtranslate _HBMK_STRINGIFY( <x> ) => <"x">
 
 #define _SELF_NAME_             "hbmk2"
 #define _SELF_NAME_LONG_        "Harbour Make"
@@ -273,7 +275,7 @@ EXTERNAL hbmk_KEYW
 #define _HBMK_SPECDIR_CONTRIB   "contrib"
 #define _HBMK_SPECDIR_ADDONS    "addons"
 
-#define _HBMK_SIGN_TIMEURL      "http://timestamp.verisign.com/scripts/timstamp.dll"
+#define _HBMK_SIGN_TIMEURL      "http://timestamp.comodoca.com/authenticode"
 
 #define _HBMK_HBEXTREQ          "__HBEXTREQ__"
 #define _HBMK_WITH_TPL          "HBMK_WITH_%1$s"
@@ -321,7 +323,7 @@ EXTERNAL hbmk_KEYW
 #define HB_ISFIRSTIDCHAR( c )   ( HB_ISALPHA( c ) .OR. ( c ) == "_" )
 #define HB_ISNEXTIDCHAR( c )    ( HB_ISFIRSTIDCHAR( c ) .OR. hb_asciiIsDigit( c ) )
 
-#define LEFTEQUAL( l, r )       ( Left( l, Len( r ) ) == r )
+#define hb_RightEq( s, c )      ( Right( s, Len( c ) ) == c )
 
 /* Logic (hack) to automatically add some libs to their
    right place in the liblist. In case of 'unicows' lib,
@@ -1273,15 +1275,15 @@ STATIC PROCEDURE hbmk_harbour_dirlayout_init( hbmk )
       /* Detect system locations to enable shared library option by default */
       IF hbmk[ _HBMK_cPLAT ] == "beos"
          hbmk[ _HBMK_lSysLoc ] := ;
-            LEFTEQUAL( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/boot/common"      ) .OR. ;
-            LEFTEQUAL( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/boot/system"      ) .OR. ;
-            LEFTEQUAL( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/boot/home/config" ) .OR. ;
-            AScan( ListToArray( GetEnv( "LIBRARY_PATH" ), ":" ), {| tmp | LEFTEQUAL( hbmk[ _HBMK_cHB_INSTALL_LIB ], tmp ) } ) > 0
+            hb_LeftEq( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/boot/common"      ) .OR. ;
+            hb_LeftEq( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/boot/system"      ) .OR. ;
+            hb_LeftEq( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/boot/home/config" ) .OR. ;
+            AScan( ListToArray( GetEnv( "LIBRARY_PATH" ), ":" ), {| tmp | hb_LeftEq( hbmk[ _HBMK_cHB_INSTALL_LIB ], tmp ) } ) > 0
       ELSE
          hbmk[ _HBMK_lSysLoc ] := ;
-            LEFTEQUAL( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/usr/local/bin" ) .OR. ;
-            LEFTEQUAL( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/usr/bin"       ) .OR. ;
-            AScan( ListToArray( GetEnv( "LD_LIBRARY_PATH" ), ":" ), {| tmp | LEFTEQUAL( hbmk[ _HBMK_cHB_INSTALL_LIB ], tmp ) } ) > 0
+            hb_LeftEq( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/usr/local/bin" ) .OR. ;
+            hb_LeftEq( hbmk[ _HBMK_cHB_INSTALL_BIN ], "/usr/bin"       ) .OR. ;
+            AScan( ListToArray( GetEnv( "LD_LIBRARY_PATH" ), ":" ), {| tmp | hb_LeftEq( hbmk[ _HBMK_cHB_INSTALL_LIB ], tmp ) } ) > 0
       ENDIF
    #endif
 
@@ -1801,6 +1803,7 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
       CASE "mingw64"
       CASE "msvc"
       CASE "msvc64"
+      CASE "msvcarm64"
       CASE "msvcia64"
       CASE "bcc"
       CASE "bcc64"
@@ -1810,7 +1813,6 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          hbmk[ _HBMK_cPLAT ] := "win"
          EXIT
       CASE "mingwarm"
-      CASE "msvcarm"
       CASE "poccarm"
          hbmk[ _HBMK_cPLAT ] := "wce"
          EXIT
@@ -1841,19 +1843,30 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
       hbmk[ _HBMK_cCCEXT ] := ".exe"
    #endif
 
+   /* Apply platform-specific library fixes */
+   IF hbmk[ _HBMK_cPLAT ] == "darwin"
+      /* On macOS, remove duplicate 'hbrdd' since ld warns about duplicate libraries and doesn't support lib grouping */
+      IF hbmk[ _HBMK_nHBMODE ] == _HBMODE_HB10
+         aLIB_BASE_RDD  := { "hbrdd", "hbusrrdd", "rddntx", "rddcdx", "rddfpt", "hbhsx", "hbsix" }
+      ELSE
+         aLIB_BASE_RDD  := { "hbrdd", "hbuddall", "hbusrrdd", "rddntx", "rddcdx", "rddnsx", "rddfpt", "hbhsx", "hbsix" }
+      ENDIF
+      aLIB_BASE_RDD_MT  := aLIB_BASE_RDD
+   ENDIF
+
    /* Setup platform dependent data */
 
    cBin_CompPRG := "harbour" + l_cHBSUFFIX
 
    DO CASE
-   CASE HBMK_ISPLAT( "darwin|bsd|hpux|sunos|beos|qnx|android|vxworks|symbian|linux|cygwin|minix|aix" )
+   CASE HBMK_ISPLAT( "darwin|bsd|hpux|sunos|beos|qnx|android|vxworks|symbian|linux|cygwin|minix|aix|wasm" )
       DO CASE
       CASE hbmk[ _HBMK_cPLAT ] == "linux"
-         aCOMPSUP := { "gcc", "clang", "icc", "watcom", "sunpro", "open64", "pcc" }
+         aCOMPSUP := { "gcc", "clang", "icc", "watcom", "sunpro", "open64", "pcc", "zig" }
       CASE hbmk[ _HBMK_cPLAT ] == "darwin"
-         aCOMPSUP := { "gcc", "clang", "icc", "pcc" }
+         aCOMPSUP := { "gcc", "clang", "icc", "pcc", "zig" }
       CASE hbmk[ _HBMK_cPLAT ] == "bsd"
-         aCOMPSUP := { "gcc", "clang", "pcc" }
+         aCOMPSUP := { "gcc", "clang", "pcc", "zig" }
       CASE hbmk[ _HBMK_cPLAT ] == "sunos"
          aCOMPSUP := { "gcc", "sunpro", "pcc" }
       CASE hbmk[ _HBMK_cPLAT ] == "android"
@@ -1864,6 +1877,8 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          aCOMPSUP := { "gcc", "icc" }
       CASE hbmk[ _HBMK_cPLAT ] == "minix"
          aCOMPSUP := { "clang", "gcc" }
+      CASE hbmk[ _HBMK_cPLAT ] == "wasm"
+         aCOMPSUP := { "emcc" }
       OTHERWISE
          aCOMPSUP := { "gcc" }
       ENDCASE
@@ -1886,6 +1901,15 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          l_aLIBHBGT := {}
          hbmk[ _HBMK_cGTDEFAULT ] := "gtstd"
          cBinExt := ".exe"
+      CASE hbmk[ _HBMK_cPLAT ] == "wasm"
+         l_aLIBHBGT := { "gtcgi" }
+         hbmk[ _HBMK_cGTDEFAULT ] := "gtcgi"
+         DO CASE
+         CASE hbmk[ _HBMK_cCOMP ] == "emcc"
+            cBinExt := ".js"
+         OTHERWISE
+            cBinExt := ""
+         ENDCASE
       OTHERWISE
          l_aLIBHBGT := { "gttrm" }
          hbmk[ _HBMK_cGTDEFAULT ] := "gttrm"
@@ -1939,16 +1963,23 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          { {|| FindInSamePath( "x86_64-w64-mingw32-gcc.exe", "gcc" ) }, "mingw64" }, ; /* mingw-w64 TDM build */
          { {|| FindInPath( "x86_64-w64-mingw32-gcc"  ) }, "mingw64", "x86_64-w64-mingw32-" }, ; /* mingw-w64 build */
          { {|| FindInPath( hbmk[ _HBMK_cCCPREFIX ] + "gcc" + hbmk[ _HBMK_cCCSUFFIX ] ) }, "mingw" }, ;
+         { {|| FindInPath( "aarch64-w64-mingw32-clang" ) }, "clang" }, ; /* MSYS2 or mingw-w64 clang */
+         { {|| FindInPath( "x86_64-w64-mingw32-clang" ) }, "clang" }, ; /* MSYS2 or mingw-w64 clang */
+         { {|| FindInPath( "lldb-vscode.exe" ) }, "clang" }, ; /* Visual Studio Build Tools */
          { {|| iif( Empty( GetEnv( "WATCOM" ) ), ;
                     NIL, ;
                     FindInPath( "wcc386" ) ) }, "watcom" }, ;
          { {|| FindInPath( "clarm.exe"  ) }, "msvcarm" }, ;
-         { {|| FindInPath( "armasm.exe" ) }, "msvcarm" }, ;
+         { {|| iif( FindInPath( "vctip.exe" ) == NIL, ;
+                    FindInPath( "armasm.exe" ), ;
+                    NIL )                    }, "msvcarm",,, "wce" }, ;
+         { {|| FindInPath( "armasm.exe" ) }, "msvcarm",,, "win" }, ;
+         { {|| FindInPath( "armasm64.exe" ) }, "msvcarm64" }, ;
          { {|| FindInPath( "ml64.exe"   ) }, "msvc64" }, ;
          { {|| FindInPath( "ias.exe"    ) }, "msvcia64" }, ;
          { {|| iif( FindInPath( "wcc386"   ) == NIL, ;
                     FindInPath( "cl.exe"   ), ;
-                    NIL )                      }, "msvc"    }, ;
+                    NIL )                    }, "msvc"    }, ;
          { {|| _BCC_BIN_DETECT()        }, "bcc"    }, ; /* TODO: Add bcc64 auto-detection */
          { {|| iif( FindInPath( "dbgeng.lib", GetEnv( "LIB" ) ) != NIL .AND. ( tmp1 := FindInPath( "pocc.exe" ) ) != NIL, tmp1, NIL ) }, "pocc64"  }, ;
          { {|| FindInPath( "pocc.exe" ) }, "pocc"   }, ;
@@ -1956,11 +1987,12 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          { {|| FindInPath( "icl.exe"  ) }, "icc"    }, ;
          { {|| FindInPath( "xCC.exe"  ) }, "xcc"    }, ;
          { {|| FindInPath( "tcc.exe"  ) }, "tcc"    }, ;
-         { {|| FindInPath( "dmc.exe"  ) }, "dmc"    } }
+         { {|| FindInPath( "dmc.exe"  ) }, "dmc"    }, ;
+         { {|| FindInPath( "zig.exe"  ) }, "zig"    } }
 #endif
       aCOMPSUP := { ;
-         "mingw", "msvc", "clang", "bcc", "watcom", "icc", "pocc", "xcc", "tcc", ;
-         "mingw64", "msvc64", "msvcia64", "bcc64", "iccia64", "pocc64" }
+         "mingw", "msvc", "clang", "bcc", "watcom", "icc", "pocc", "xcc", "tcc", "zig", ;
+         "mingw64", "msvc64", "msvcarm", "msvcarm64", "msvcia64", "bcc64", "iccia64", "pocc64" }
       l_aLIBHBGT := { "gtwin", "gtwvt", "gtgui" }
       hbmk[ _HBMK_cGTDEFAULT ] := "gtwin"
       hbmk[ _HBMK_cDynLibPrefix ] := ""
@@ -2028,6 +2060,7 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          tmp3 := NIL; HB_SYMBOL_UNUSED( tmp3 )
 
          AAdd( aCOMPDET_EMBED, { {| cPrefix | tmp1 := hb_PathNormalize( hb_DirSepAdd( hbmk[ _HBMK_cHB_INSTALL_PFX ] ) + _HBMK_SPECDIR_COMP + hb_ps() + "mingw"    + hb_ps() + "bin"   ), iif( hb_FileExists( tmp1 + hb_ps() + cPrefix + "gcc" + hbmk[ _HBMK_cCCEXT ] ), tmp1, NIL ) }, "win"  , "mingw"   , ""                    , NIL, {| cARCH, cCOMP, cPathBin | hbmk_COMP_Setup( cARCH, cCOMP, cPathBin + hb_ps() + ".." ) } } )
+         AAdd( aCOMPDET_EMBED, { {| cPrefix | tmp1 := hb_PathNormalize( hb_DirSepAdd( hbmk[ _HBMK_cHB_INSTALL_PFX ] ) + _HBMK_SPECDIR_COMP + hb_ps() + "mingw64"  + hb_ps() + "bin"   ), iif( hb_FileExists( tmp1 + hb_ps() + cPrefix + "gcc" + hbmk[ _HBMK_cCCEXT ] ), tmp1, NIL ) }, "win"  , "mingw64" , ""                    , NIL, NIL } )
          AAdd( aCOMPDET_EMBED, { {| cPrefix | tmp1 := hb_PathNormalize( hb_DirSepAdd( hbmk[ _HBMK_cHB_INSTALL_PFX ] ) + _HBMK_SPECDIR_COMP + hb_ps() + "mingw64"  + hb_ps() + "bin"   ), iif( hb_FileExists( tmp1 + hb_ps() + cPrefix + "gcc" + hbmk[ _HBMK_cCCEXT ] ), tmp1, NIL ) }, "win"  , "mingw64" , "i686-w64-mingw32-"   , NIL, NIL } )
          AAdd( aCOMPDET_EMBED, { {| cPrefix | tmp1 := hb_PathNormalize( hb_DirSepAdd( hbmk[ _HBMK_cHB_INSTALL_PFX ] ) + _HBMK_SPECDIR_COMP + hb_ps() + "mingw64"  + hb_ps() + "bin"   ), iif( hb_FileExists( tmp1 + hb_ps() + cPrefix + "gcc" + hbmk[ _HBMK_cCCEXT ] ), tmp1, NIL ) }, "win"  , "mingw64" , "x86_64-w64-mingw32-" , NIL, NIL } )
          AAdd( aCOMPDET_EMBED, { {| cPrefix | tmp1 := hb_PathNormalize( hb_DirSepAdd( hbmk[ _HBMK_cHB_INSTALL_PFX ] ) + _HBMK_SPECDIR_COMP + hb_ps() + "mingwarm" + hb_ps() + "bin"   ), iif( hb_FileExists( tmp1 + hb_ps() + cPrefix + "gcc" + hbmk[ _HBMK_cCCEXT ] ), tmp1, NIL ) }, "wce"  , "mingwarm", "arm-mingw32ce-"      , NIL, NIL } )
@@ -2142,11 +2175,11 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
                            DO CASE
                            CASE FindInPath( "os2.h", GetEnv( "INCLUDE" ) ) != NIL
                               hbmk[ _HBMK_cPLAT ] := "os2"
-                           CASE FindInPath( "dirent.h", GetEnv( "INCLUDE" ) ) != NIL
-                              hbmk[ _HBMK_cPLAT ] := "linux"
                            CASE FindInPath( "windows.h", GetEnv( "INCLUDE" ) ) != NIL
                               hbmk[ _HBMK_cPLAT ] := "win"
-                           OTHERWISE
+                           CASE At( Lower( PathSepToForward( GetEnv( "WATCOM" ) ) ) + "/lh", Lower( PathSepToForward( GetEnv( "INCLUDE" ) ) ) ) > 0
+                              hbmk[ _HBMK_cPLAT ] := "linux"
+                           CASE hbmk[ _HBMK_cPLAT ] == Lower( hb_Version( HB_VERSION_PLATFORM ) )
                               hbmk[ _HBMK_cPLAT ] := "dos"
                            ENDCASE
                         ENDIF
@@ -2250,6 +2283,16 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
       ENDIF
    ENDIF
 
+   IF hb_LeftEq( hbmk[ _HBMK_cCOMP ], "msvc" ) .AND. Empty( cPath_CompC )
+      cPath_CompC := FindInPath( "cl.exe" )
+      IF Empty( cPath_CompC )
+         cPath_CompC := FindInPath( "link.exe" )
+         IF ! Empty( cPath_CompC )
+            cPath_CompC := hb_FNameDir( cPath_CompC ) + SubStr( hbmk[ _HBMK_cCOMP ], 5 ) + ".exe"
+         ENDIF
+      ENDIF
+   ENDIF
+
    DO CASE
    CASE hbmk[ _HBMK_cPLAT ] == "vxworks"
       AAdd( hbmk[ _HBMK_aINCPATH ], hb_DirSepToOS( GetEnv( "WIND_BASE" ) + "/target/usr/h" ) )
@@ -2323,7 +2366,7 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
             hbmk[ _HBMK_nCOMPVer ] := 34
          ENDCASE
 
-      CASE ( hbmk[ _HBMK_cPLAT ] == "win" .AND. HBMK_ISCOMP( "msvc|msvc64|msvcia64|icc|iccia64" ) ) .OR. ;
+      CASE ( hbmk[ _HBMK_cPLAT ] == "win" .AND. HBMK_ISCOMP( "msvc|msvc64|msvcarm|msvcarm64|msvcia64|icc|iccia64" ) ) .OR. ;
            ( hbmk[ _HBMK_cPLAT ] == "wce" .AND. hbmk[ _HBMK_cCOMP ] == "msvcarm" ) /* NOTE: Cross-platform: wce/ARM on win/x86 */
 
          /* Compatibility with Harbour GNU Make system */
@@ -2333,18 +2376,43 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
             DO CASE
             CASE "VC98" $ cPath_CompC
                hbmk[ _HBMK_nCOMPVer ] := 1200
-            CASE "2003" $ cPath_CompC
+            CASE " 2003" + hb_ps() $ cPath_CompC
                hbmk[ _HBMK_nCOMPVer ] := 1300
-            CASE "8" + hb_ps() $ cPath_CompC /* Visual Studio 2005 */
+            CASE "Studio 8" + hb_ps() $ cPath_CompC /* Visual Studio 2005 */
                hbmk[ _HBMK_nCOMPVer ] := 1400
-            CASE "9.0" $ cPath_CompC /* Visual Studio 2008 or Windows SDK 7.0 */
+            CASE hb_ps() + "9.0" $ cPath_CompC /* Visual Studio 2008 or Windows SDK 7.0 */
                hbmk[ _HBMK_nCOMPVer ] := 1500
-            CASE "10.0" $ cPath_CompC /* Visual Studio 2010 or Windows SDK 7.1 */
+            CASE hb_ps() + "10.0" $ cPath_CompC /* Visual Studio 2010 or Windows SDK 7.1 */
                hbmk[ _HBMK_nCOMPVer ] := 1600
-            CASE "11.0" $ cPath_CompC /* Visual Studio 2012 */
+            CASE hb_ps() + "11.0" $ cPath_CompC /* Visual Studio 2012 */
                hbmk[ _HBMK_nCOMPVer ] := 1700
+            CASE hb_ps() + "12.0" $ cPath_CompC /* Visual Studio 2013 */
+               hbmk[ _HBMK_nCOMPVer ] := 1800
+            CASE hb_ps() + "14.0" $ cPath_CompC /* Visual Studio 2015 */
+               hbmk[ _HBMK_nCOMPVer ] := 1900
+            CASE hb_ps() + "14.1" $ cPath_CompC /* Visual Studio 2017 */
+               hbmk[ _HBMK_nCOMPVer ] := 1910
+            CASE hb_ps() + "14.2" $ cPath_CompC /* Visual Studio 2019 */
+               hbmk[ _HBMK_nCOMPVer ] := 1920
+            CASE hb_ps() + "14.3" $ cPath_CompC /* Visual Studio 2022 */
+               hbmk[ _HBMK_nCOMPVer ] := 1930
+            CASE hb_ps() + "14.4" $ cPath_CompC /* Visual Studio 2022 */
+               hbmk[ _HBMK_nCOMPVer ] := 1940
             OTHERWISE
-               hbmk[ _HBMK_nCOMPVer ] := 1400
+               /* trying to discover future versions of VS */
+               IF Empty( tmp := GetEnv( "VCTOOLSVERSION" ) )
+                  IF ! Empty( tmp := GetEnv( "VSINSTALLDIR" ) )
+                     tmp := hb_MemoRead( tmp + "VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt" )
+                  ENDIF
+               ENDIF
+               tmp := Int( Val( Left( tmp, At( ".", tmp ) ) + StrTran( SubStr( tmp, At( ".", tmp ) ), "." ) ) * 100 )
+               IF tmp >= 800 .AND. tmp < 1300
+                  hbmk[ _HBMK_nCOMPVer ] := tmp + 600
+               ELSEIF tmp >= 1400
+                  hbmk[ _HBMK_nCOMPVer ] := tmp + 500
+               ELSE
+                  hbmk[ _HBMK_nCOMPVer ] := 1400
+               ENDIF
             ENDCASE
          ENDIF
       ENDCASE
@@ -3574,7 +3642,7 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
       CASE hb_FNameExt( cParamL ) == ".res"
 
          IF HBMK_ISCOMP( "mingw|mingw64|mingwarm" ) .OR. ;
-            ( hbmk[ _HBMK_cPLAT ] == "win" .AND. HBMK_ISCOMP( "clang" ) ) .OR. ;
+            ( hbmk[ _HBMK_cPLAT ] == "win" .AND. HBMK_ISCOMP( "clang|zig" ) ) .OR. ;
             ( hbmk[ _HBMK_cPLAT ] == "os2" .AND. HBMK_ISCOMP( "gcc|gccomf" ) )
             /* For MinGW/EMX GCC family add .res files as source input, as they
                will need to be converted to coff format with windres (just
@@ -3861,7 +3929,7 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
 
       hb_default( @hbmk[ _HBMK_lSHAREDDIST ], hbmk[ _HBMK_lSysLoc ] )
 
-      IF hbmk[ _HBMK_lSHAREDDIST ] .OR. ! HBMK_ISCOMP( "gcc|clang|open64" )
+      IF hbmk[ _HBMK_lSHAREDDIST ] .OR. ! HBMK_ISCOMP( "gcc|zig|clang|open64" )
          l_cDynLibDir := ""
       ELSE
          /* Only supported by gcc, clang, open64 compilers. */
@@ -3905,28 +3973,29 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
 
       /* Command macros:
 
-         {LC}     list of C files
-         {LR}     list of resource source files (Windows specific)
-         {LS}     list of resource binary files (Windows specific)
-         {LO}     list of object files
-         {LA}     list of object archive (.a) files
-         {LL}     list of lib files
-         {LF}     list of lib files (as flag)
-         {LB}     list of lib files with paths
-         {FC}     flags for C compiler (user + automatic)
-         {FL}     flags for linker (user + automatic)
-         {FS}     flags for code sign tool
-         {UT}     url for timestamp (code sign tool)
-         {OW}     working dir (when in -inc mode)
-         {OD}     output dir
-         {OO}     output object (when in -hbcmp mode)
-         {OE}     output executable
-         {OM}     output map name
-         {OI}     output implib name
-         {DB}     dir for binaries
-         {DI}     dir for includes
-         {DL}     dirs for libs
-         {SCRIPT} save command-line to script and pass it to command as @<filename>
+         {LC}        list of C files
+         {LR}        list of resource source files (Windows specific)
+         {LS}        list of resource binary files (Windows specific)
+         {LO}        list of object files
+         {LA}        list of object archive (.a) files
+         {LL}        list of lib files
+         {LF}        list of lib files (as flag)
+         {LB}        list of lib files with paths
+         {FC}        flags for C compiler (user + automatic)
+         {FL}        flags for linker (user + automatic)
+         {FS}        flags for code sign tool
+         {UT}        url for timestamp (code sign tool)
+         {OW}        working dir (when in -inc mode)
+         {OD}        output dir
+         {OO}        output object (when in -hbcmp mode)
+         {OE}        output executable
+         {OM}        output map name
+         {OI}        output implib name
+         {DB}        dir for binaries
+         {DI}        dir for includes
+         {DL}        dirs for libs
+         {SCRIPT}    save command-line to script and pass it to command as @<filename>
+         {ESCAPE_BS} escape backslashes in script
        */
 
       /* Assemble library list */
@@ -3965,6 +4034,13 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
 
       cLibHBX_Regex := R_( "[\s]_?HB_FUN_([A-Z0-9_]*)[\s]" )
 
+      /* is there a zig's own variable that does this? */
+      IF hbmk[ _HBMK_cCOMP ] == "zig" .AND. ! Empty( GetEnv("HB_ZIG_TARGET") )
+         AAdd( hbmk[ _HBMK_aOPTC ], "-target " + GetEnv("HB_ZIG_TARGET") )
+         AAdd( hbmk[ _HBMK_aOPTL ], "-target " + GetEnv("HB_ZIG_TARGET") )
+         AAdd( hbmk[ _HBMK_aOPTD ], "-target " + GetEnv("HB_ZIG_TARGET") )
+      ENDIF
+
       DO CASE
       /* GCC family */
       CASE ( hbmk[ _HBMK_cPLAT ] == "bsd"     .AND. hbmk[ _HBMK_cCOMP ] == "gcc" ) .OR. ;
@@ -3992,7 +4068,11 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
            ( hbmk[ _HBMK_cPLAT ] == "linux"   .AND. hbmk[ _HBMK_cCOMP ] == "pcc" ) .OR. ;
            ( hbmk[ _HBMK_cPLAT ] == "sunos"   .AND. hbmk[ _HBMK_cCOMP ] == "pcc" ) .OR. ;
            ( hbmk[ _HBMK_cPLAT ] == "minix"   .AND. hbmk[ _HBMK_cCOMP ] == "gcc" ) .OR. ;
-           ( hbmk[ _HBMK_cPLAT ] == "aix"     .AND. hbmk[ _HBMK_cCOMP ] == "gcc" )
+           ( hbmk[ _HBMK_cPLAT ] == "aix"     .AND. hbmk[ _HBMK_cCOMP ] == "gcc" ) .OR. ;
+           ( hbmk[ _HBMK_cPLAT ] == "linux"   .AND. hbmk[ _HBMK_cCOMP ] == "zig" ) .OR. ;
+           ( hbmk[ _HBMK_cPLAT ] == "darwin"  .AND. hbmk[ _HBMK_cCOMP ] == "zig" ) .OR. ;
+           ( hbmk[ _HBMK_cPLAT ] == "bsd"     .AND. hbmk[ _HBMK_cCOMP ] == "zig" ) .OR. ;
+           ( hbmk[ _HBMK_cPLAT ] == "wasm"   .AND. hbmk[ _HBMK_cCOMP ] == "emcc" )
 
          #if defined( __PLATFORM__UNIX )
             hbmk[ _HBMK_nCmd_Esc ] := _ESC_NIX
@@ -4014,15 +4094,19 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          cLibPrefix := "-l"
          cLibExt := ""
          cObjExt := ".o"
-         IF hbmk[ _HBMK_cPLAT ] == "darwin"
+         IF hbmk[ _HBMK_cPLAT ] == "darwin" .AND. ! hbmk[ _HBMK_cCOMP ] == "zig"
             cBin_Lib := "libtool"
             cOpt_Lib := "-static -no_warning_for_no_symbols {FA} -o {OL} {LO}"
          ELSE
             DO CASE
+            CASE hbmk[ _HBMK_cCOMP ] == "emcc"
+               cBin_Lib := GetEnv( "LLVM_ROOT" ) + hb_ps() + "llvm-ar"
             CASE hbmk[ _HBMK_cCOMP ] == "icc"
                cBin_Lib := "xiar"
             CASE hbmk[ _HBMK_cPLAT ] == "vxworks"
                cBin_Lib := hbmk[ _HBMK_cCCPREFIX ] + "ar" + hbmk[ _HBMK_cCCSUFFIX ]
+            CASE hbmk[ _HBMK_cCOMP ] == "zig"
+               cBin_Lib := "zig ar"
             OTHERWISE
                cBin_Lib := hbmk[ _HBMK_cCCPREFIX ] + "ar"
             ENDCASE
@@ -4053,6 +4137,12 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          CASE hbmk[ _HBMK_cPLAT ] == "vxworks"
             cBin_CompCPP := hbmk[ _HBMK_cCCPREFIX ] + "g++" + hbmk[ _HBMK_cCCSUFFIX ]
             cBin_CompC := iif( hbmk[ _HBMK_lCPP ] != NIL .AND. hbmk[ _HBMK_lCPP ], cBin_CompCPP, hbmk[ _HBMK_cCCPREFIX ] + "cc" + hbmk[ _HBMK_cCCSUFFIX ] )
+         CASE hbmk[ _HBMK_cCOMP ] == "emcc"
+            cBin_CompCPP := hbmk[ _HBMK_cCCPREFIX ] + "em++" + hbmk[ _HBMK_cCCSUFFIX ]
+            cBin_CompC := iif( hbmk[ _HBMK_lCPP ] != NIL .AND. hbmk[ _HBMK_lCPP ], cBin_CompCPP, hbmk[ _HBMK_cCCPREFIX ] + "emcc" + hbmk[ _HBMK_cCCSUFFIX ] )
+         CASE hbmk[ _HBMK_cCOMP ] == "zig"
+            cBin_CompCPP := "zig c++"
+            cBin_CompC := "zig cc"
          OTHERWISE
             cBin_CompCPP := hbmk[ _HBMK_cCCPREFIX ] + "g++" + hbmk[ _HBMK_cCCSUFFIX ]
             cBin_CompC := iif( hbmk[ _HBMK_lCPP ] != NIL .AND. hbmk[ _HBMK_lCPP ], cBin_CompCPP, hbmk[ _HBMK_cCCPREFIX ] + "gcc" + hbmk[ _HBMK_cCCSUFFIX ] )
@@ -4099,14 +4189,21 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          IF hbmk[ _HBMK_cPLAT ] == "minix"
             AAdd( hbmk[ _HBMK_aOPTC ], "-D_NETBSD_SOURCE=1" )
          ENDIF
+         IF hbmk[ _HBMK_cPLAT ] == "wasm" .AND. hbmk[ _HBMK_cCOMP ] == "emcc"
+            AAdd( hbmk[ _HBMK_aOPTL ], "-sWASM=1" )
+            AAdd( hbmk[ _HBMK_aOPTD ], "-sWASM=1" )
+         ENDIF
+
          cOpt_CompC += " {FC}"
          IF ! Empty( hbmk[ _HBMK_cWorkDir ] )
             /* Symbian gcc cross-compiler (on Windows) crashes if compiling multiple files at once */
-            IF ! hbmk[ _HBMK_cPLAT ] == "symbian"  /* EXPERIMENTAL */
+            IF ! hbmk[ _HBMK_cPLAT ] == "symbian" .AND. ;  /* EXPERIMENTAL */
+               ! hbmk[ _HBMK_cCOMP ] == "emcc" .AND. ; /* It creates the output in the source directory if no -o option is passed */
+               ! hbmk[ _HBMK_cCOMP ] == "zig"
                lCHD_Comp := .T.
                cOpt_CompC += " {LC}"
             ELSE
-               IF HBMK_ISPLAT( "linux|bsd" ) .AND. hbmk[ _HBMK_cCOMP ] == "clang"
+               IF HBMK_ISPLAT( "linux|bsd" ) .AND. HBMK_ISCOMP( "clang|zig")
                   /* NOTE: It is also accepted by darwin/clang */
                   cOpt_CompC += " {IC} -o{OO}"
                ELSE
@@ -4141,13 +4238,18 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          IF hbmk[ _HBMK_cPLAT ] == "darwin"
             cLibHBX_Regex := R_( "[\s]T" ) + cLibHBX_Regex
          ENDIF
-         IF l_lLIBGROUPING .AND. HBMK_ISPLAT( "linux|beos|qnx|android|vxworks|cygwin|bsd" )
+         IF l_lLIBGROUPING .AND. HBMK_ISPLAT( "linux|beos|qnx|android|vxworks|cygwin|bsd|wasm" )
             AAdd( hbmk[ _HBMK_aOPTL ], "-Wl,--start-group {LL} {LB} {LF} -Wl,--end-group" )
             AAdd( hbmk[ _HBMK_aOPTD ], "-Wl,--start-group {LL} {LB} {LF} -Wl,--end-group" )
          ELSE
             AAdd( hbmk[ _HBMK_aOPTL ], "{LL} {LB} {LF}" )
             AAdd( hbmk[ _HBMK_aOPTD ], "{LL} {LB} {LF}" )
-            l_aLIBHBBASE_2 := iif( hbmk[ _HBMK_lMT ], aLIB_BASE_2_MT, aLIB_BASE_2 )
+            IF hbmk[ _HBMK_cPLAT ] == "darwin"
+               /* On macOS, ld can handle circular dependencies without duplicates and warns about duplicate libraries */
+               l_aLIBHBBASE_2 := {}
+            ELSE
+               l_aLIBHBBASE_2 := iif( hbmk[ _HBMK_lMT ], aLIB_BASE_2_MT, aLIB_BASE_2 )
+            ENDIF
          ENDIF
          IF hbmk[ _HBMK_cPLAT ] == "darwin"
             /* Leave space for later modifying .dylib paths using `install_name_tool`.
@@ -4203,14 +4305,14 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          ENDIF
          IF lStopAfterCComp
             IF ! hbmk[ _HBMK_lCreateLib ] .AND. ! hbmk[ _HBMK_lCreateDyn ] .AND. ( Len( hbmk[ _HBMK_aPRG ] ) + Len( hbmk[ _HBMK_aC ] ) + Len( hbmk[ _HBMK_aCPP ] ) ) == 1
-               IF HBMK_ISPLAT( "darwin|sunos" ) .OR. HBMK_ISCOMP( "pcc" )
+               IF HBMK_ISPLAT( "darwin|sunos" ) .OR. HBMK_ISCOMP( "pcc|emcc" )
                   AAdd( hbmk[ _HBMK_aOPTC ], "-o {OO}" )
                ELSE
                   AAdd( hbmk[ _HBMK_aOPTC ], "-o{OO}" )
                ENDIF
             ENDIF
          ELSE
-            IF HBMK_ISPLAT( "darwin|sunos" ) .OR. HBMK_ISCOMP( "pcc" )
+            IF HBMK_ISPLAT( "darwin|sunos" ) .OR. HBMK_ISCOMP( "pcc|emcc" )
                AAdd( hbmk[ _HBMK_aOPTL ], "-o {OE}" )
             ELSE
                AAdd( hbmk[ _HBMK_aOPTL ], "-o{OE}" )
@@ -4341,6 +4443,7 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
            ( hbmk[ _HBMK_cPLAT ] == "win" .AND. hbmk[ _HBMK_cCOMP ] == "mingw64" ) .OR. ;
            ( hbmk[ _HBMK_cPLAT ] == "win" .AND. hbmk[ _HBMK_cCOMP ] == "clang" ) .OR. ;
            ( hbmk[ _HBMK_cPLAT ] == "win" .AND. hbmk[ _HBMK_cCOMP ] == "tcc" ) .OR. ;
+           ( hbmk[ _HBMK_cPLAT ] == "win" .AND. hbmk[ _HBMK_cCOMP ] == "zig" ) .OR. ;
            ( hbmk[ _HBMK_cPLAT ] == "wce" .AND. hbmk[ _HBMK_cCOMP ] == "mingw" ) .OR. ;
            ( hbmk[ _HBMK_cPLAT ] == "wce" .AND. hbmk[ _HBMK_cCOMP ] == "mingwarm" )
 
@@ -4357,6 +4460,21 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          CASE hbmk[ _HBMK_cCOMP ] == "clang"
             cBin_CompCPP := hbmk[ _HBMK_cCCPREFIX ] + "clang++" + hbmk[ _HBMK_cCCSUFFIX ] + hbmk[ _HBMK_cCCEXT ]
             cBin_CompC := iif( hbmk[ _HBMK_lCPP ] != NIL .AND. hbmk[ _HBMK_lCPP ], cBin_CompCPP, hbmk[ _HBMK_cCCPREFIX ] + "clang" + hbmk[ _HBMK_cCCSUFFIX ] + hbmk[ _HBMK_cCCEXT ] )
+            IF hb_fileExists( hb_DirSepAdd( hbmk[ _HBMK_cHB_INSTALL_LIB ] ) + "hbrtl.lib" ) /* selfcheck if clang ld emits .lib extension */
+               cLibLibPrefix := ""
+               cLibLibExt := ".lib"
+               IF hbmk[ _HBMK_lGUI ]
+                  AAdd( hbmk[ _HBMK_aOPTL ], "-Wl,-subsystem:windows" )
+               ELSE
+                  AAdd( hbmk[ _HBMK_aOPTL ], "-Wl,-subsystem:console" )
+               ENDIF
+            ENDIF
+         CASE hbmk[ _HBMK_cCOMP ] == "zig"
+            cBin_CompCPP := "zig" + hbmk[ _HBMK_cCCEXT ] + " c++"
+            cBin_CompC := iif( hbmk[ _HBMK_lCPP ] != NIL .AND. hbmk[ _HBMK_lCPP ], cBin_CompCPP, "zig" + hbmk[ _HBMK_cCCEXT ] + " cc" )
+            IF hbmk[ _HBMK_lGUI ]
+               AAdd( hbmk[ _HBMK_aOPTL ], "-Wl,/subsystem:windows" )
+            ENDIF
          CASE hbmk[ _HBMK_cCOMP ] == "tcc"
             cBin_CompCPP := "tcc.exe"
             cBin_CompC := cBin_CompCPP
@@ -4409,7 +4527,13 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          cOpt_CompC += " {FC}"
          cOptIncMask := "-I{DI}"
          IF ! Empty( hbmk[ _HBMK_cWorkDir ] )
-            IF .T. /* EXPERIMENTAL */
+            IF ! hbmk[ _HBMK_cCOMP ] == "zig"
+               /* IF .T. -- EXPERIMENTAL was here
+                * experiment was successful, except now
+                * not for zig compiler front on Windows
+                * it bugs out with such message:
+                * error: coff does not support linking multiple objects into one
+                * on multiple source files [alcz] ... which are not objects */
                lCHD_Comp := .T.
                cOpt_CompC += " {LC}"
             ELSE
@@ -4423,7 +4547,11 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          AAddNotEmpty( hbmk[ _HBMK_aOPTCPPX ], gcc_opt_lngcpp_fill( hbmk ) )
          cBin_Dyn := cBin_CompC
          cOpt_Dyn := "-shared -o {OD} {LO} {FD} {IM} {DL} {LS}"
-         IF ! hbmk[ _HBMK_cCOMP ] == "tcc"
+         IF "--script-mingw" $ GetEnv("HB_USER_FIXES")
+            cOpt_Dyn += "{SCRIPT_MINGW}"
+         ELSEIF HBMK_ISCOMP( "clang|zig")
+            cOpt_Dyn += "{SCRIPT}{ESCAPE_BS}"
+         ELSEIF ! hbmk[ _HBMK_cCOMP ] == "tcc"
             cOpt_Dyn += "{SCRIPT_MINGW}"
          ENDIF
          cBin_Link := cBin_CompC
@@ -4431,9 +4559,16 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          bBlk_ImpLib := {| cSourceDLL, cTargetLib, cFlags | win_implib_command_gcc( hbmk, hbmk[ _HBMK_cCCPREFIX ] + "dlltool" + hbmk[ _HBMK_cCCSUFFIX ] + hbmk[ _HBMK_cCCEXT ] + " {FI} -d {ID} -l {OL}", cSourceDLL, cTargetLib, cFlags ) }
          cLibPathPrefix := "-L"
          cLibPathSep := " "
-         cLibLibExt := ".a"
+         IF cLibLibExt == ""
+            cLibLibExt := ".a"
+         ENDIF
          cImpLibExt := cLibLibExt
-         IF hbmk[ _HBMK_cCOMP ] == "tcc"
+         IF hbmk[ _HBMK_cCOMP ] == "clang" .AND. !( FindInPath( hbmk[ _HBMK_cCCPREFIX ] + "llvm-ar" + hbmk[ _HBMK_cCCEXT ] ) == NIL )
+            /* new clang toolchains not always distribute llvm-ar (or it is renamed) */
+            cBin_Lib := hbmk[ _HBMK_cCCPREFIX ] + "llvm-ar" + hbmk[ _HBMK_cCCEXT ]
+         ELSEIF hbmk[ _HBMK_cCOMP ] == "zig"
+            cBin_Lib := "zig" + hbmk[ _HBMK_cCCEXT ] + " ar"
+         ELSEIF hbmk[ _HBMK_cCOMP ] == "tcc"
             cBin_Lib := "tiny_libmaker.exe"
          ELSE
             cBin_Lib := hbmk[ _HBMK_cCCPREFIX ] + "ar" + hbmk[ _HBMK_cCCEXT ]
@@ -4483,8 +4618,14 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
             AAdd( hbmk[ _HBMK_aOPTD ], "-Wl,-Map,{OM}" )
          ENDIF
          IF hbmk[ _HBMK_lIMPLIB ]
-            AAdd( hbmk[ _HBMK_aOPTL ], "-Wl,--out-implib,{OI}" )
-            AAdd( hbmk[ _HBMK_aOPTD ], "-Wl,--out-implib,{OI}" )
+            IF ( ! hbmk[ _HBMK_cCOMP ] == "clang" .OR. ; /* selfcheck if clang ld is MinGW style */
+                 ! hb_fileExists( hb_DirSepAdd( hbmk[ _HBMK_cHB_INSTALL_LIB ] ) + "hbrtl.lib" ) )
+               AAdd( hbmk[ _HBMK_aOPTL ], "-Wl,--out-implib,{OI}" )
+               AAdd( hbmk[ _HBMK_aOPTD ], "-Wl,--out-implib,{OI}" )
+            ELSE /* clang using lld-link on Windows has option similar to MS link */
+               AAdd( hbmk[ _HBMK_aOPTL ], "-Wl,-implib:{OI}" )
+               AAdd( hbmk[ _HBMK_aOPTD ], "-Wl,-implib:{OI}" )
+            ENDIF
          ENDIF
          IF l_lLIBGROUPING .AND. HBMK_ISCOMP( "mingw|mingw64|mingwarm" )
             AAdd( hbmk[ _HBMK_aOPTL ], "-Wl,--start-group {LL} {LB} {LF} -Wl,--end-group" )
@@ -4492,7 +4633,13 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          ELSE
             AAdd( hbmk[ _HBMK_aOPTL ], "{LL} {LB} {LF}" )
             AAdd( hbmk[ _HBMK_aOPTD ], "{LL} {LB} {LF}" )
-            l_aLIBHBBASE_2 := iif( hbmk[ _HBMK_lMT ], aLIB_BASE_2_MT, aLIB_BASE_2 )
+            IF hbmk[ _HBMK_cPLAT ] == "darwin"
+               /* On macOS, ld warns about duplicate libraries, so we skip the duplicate base libs
+                  since macOS ld can handle circular dependencies without explicit grouping */
+               l_aLIBHBBASE_2 := {}
+            ELSE
+               l_aLIBHBBASE_2 := iif( hbmk[ _HBMK_lMT ], aLIB_BASE_2_MT, aLIB_BASE_2 )
+            ENDIF
          ENDIF
          IF hbmk[ _HBMK_lSTRIP ]
             IF hbmk[ _HBMK_lCreateLib ]
@@ -4547,6 +4694,24 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
             cBin_Res := hbmk[ _HBMK_cCCPREFIX ] + "windres" + hbmk[ _HBMK_cCCEXT ]
             cResExt := ".reso"
             cOpt_Res := "{FR} {IR} -O coff -o {OS}"
+            IF hbmk[ _HBMK_cCOMP ] == "clang" .AND. FindInPath( cBin_Res ) == NIL
+               IF FindInPath( cBin_Res := "llvm-" + cBin_Res ) == NIL
+                  cBin_Res := "llvm-rc"
+                  cResExt := ".res"
+                  /* codepage default in llvm-rc is confusing, a .rc file could be multi-language */
+                  cOpt_Res := "/C 1252 {FR} /FO {OS} {IR}"
+               ENDIF
+            ENDIF
+
+            IF ! Empty( hbmk[ _HBMK_cCCPATH ] )
+               cBin_Res := FNameEscape( hbmk[ _HBMK_cCCPATH ] + hb_ps() + cBin_Res, hbmk[ _HBMK_nCmd_Esc ] )
+            ENDIF
+         ELSEIF hbmk[ _HBMK_cCOMP ] == "zig"
+            cBin_Res := "zig" + hbmk[ _HBMK_cCCEXT ] + " rc"
+            cResExt := ".res"
+            /* codepage default is confusing here too, a .rc file could be multi-language */
+            cOpt_Res := "/C 1252 {FR} /FO {OS} {IR}"
+
             IF ! Empty( hbmk[ _HBMK_cCCPATH ] )
                cBin_Res := FNameEscape( hbmk[ _HBMK_cCCPATH ] + hb_ps() + cBin_Res, hbmk[ _HBMK_nCmd_Esc ] )
             ENDIF
@@ -5120,7 +5285,7 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          l_aLIBSHAREDPOST := { "hbmainstd", "hbmainwin" }
          l_aLIBSYS := ArrayAJoin( { l_aLIBSYS, l_aLIBSYSCORE, l_aLIBSYSMISC } )
 
-      CASE ( hbmk[ _HBMK_cPLAT ] == "win" .AND. HBMK_ISCOMP( "msvc|msvc64|msvcia64|icc|iccia64" ) ) .OR. ;
+      CASE ( hbmk[ _HBMK_cPLAT ] == "win" .AND. HBMK_ISCOMP( "msvc|msvc64|msvcarm|msvcarm64|msvcia64|icc|iccia64" ) ) .OR. ;
            ( hbmk[ _HBMK_cPLAT ] == "wce" .AND. hbmk[ _HBMK_cCOMP ] == "msvcarm" ) /* NOTE: Cross-platform: wce/ARM on win/x86 */
 
          hbmk[ _HBMK_nCmd_FNF ] := _FNF_BCKSLASH
@@ -5250,10 +5415,11 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          SWITCH hbmk[ _HBMK_cCOMP ]
          CASE "msvc"     ; AAdd( hbmk[ _HBMK_aOPTI ], "-machine:x86"  ) ; EXIT
          CASE "msvc64"   ; AAdd( hbmk[ _HBMK_aOPTI ], "-machine:x64"  ) ; EXIT
+         CASE "msvcarm"  ; AAdd( hbmk[ _HBMK_aOPTI ], IIF( hbmk[ _HBMK_cPLAT ] == "wce", "-machine:xarm", "-machine:arm" ) ) ; EXIT
+         CASE "msvcarm64"; AAdd( hbmk[ _HBMK_aOPTI ], "-machine:arm64"  ) ; EXIT
          CASE "msvcia64" ; AAdd( hbmk[ _HBMK_aOPTI ], "-machine:ia64" ) ; EXIT
          CASE "icc"      ; AAdd( hbmk[ _HBMK_aOPTI ], "-machine:x86"  ) ; EXIT
          CASE "iccia64"  ; AAdd( hbmk[ _HBMK_aOPTI ], "-machine:ia64" ) ; EXIT
-         CASE "msvcarm"  ; AAdd( hbmk[ _HBMK_aOPTI ], "-machine:xarm" ) ; EXIT
          CASE "msvcmips" ; AAdd( hbmk[ _HBMK_aOPTI ], "-machine:mips" ) ; EXIT
          CASE "msvcsh"   ; AAdd( hbmk[ _HBMK_aOPTI ], "-machine:sh5"  ) ; EXIT
          ENDSWITCH
@@ -5882,7 +6048,7 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
          ENDCASE
          l_aPRG_TO_DO := {}
          FOR EACH tmp IN hbmk[ _HBMK_aPRG ]
-            IF LEFTEQUAL( tmp, "@" ) .AND. Lower( hb_FNameExt( tmp ) ) == ".clp"
+            IF hb_LeftEq( tmp, "@" ) .AND. Lower( hb_FNameExt( tmp ) ) == ".clp"
                tmp3 := SubStr( tmp, 1 + 1 )
             ELSE
                tmp3 := tmp
@@ -6173,13 +6339,13 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
                DO CASE
                CASE ! hbmk[ _HBMK_lSHARED ] .OR. ;
                     ! HBMK_ISPLAT( "win|wce" ) .OR. ;
-                    HBMK_ISCOMP( "msvc|msvc64|msvcia64|icc|iccia64" )
+                    HBMK_ISCOMP( "msvc|msvc64|msvcarm|msvcarm64|msvcia64|icc|iccia64" )
 
                   /* NOTE: MSVC gives the warning:
                            "LNK4217: locally defined symbol ... imported in function ..."
                            if using 'dllimport'. [vszakats] */
                   tmp := ""
-               CASE HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|clang" )
+               CASE HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|clang|zig" )
                   tmp := "__attribute__ (( dllimport ))"
                CASE HBMK_ISCOMP( "bcc|bcc64|watcom" )
                   tmp := "__declspec( dllimport )"
@@ -6783,7 +6949,7 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
             l_aPRG_TO_DO := {}
 
             FOR EACH tmp IN hbmk[ _HBMK_aPRG ]
-               IF LEFTEQUAL( tmp, "@" ) .AND. Lower( hb_FNameExt( tmp ) ) == ".clp"
+               IF hb_LeftEq( tmp, "@" ) .AND. Lower( hb_FNameExt( tmp ) ) == ".clp"
                   tmp3 := SubStr( tmp, 2 )
                ELSE
                   tmp3 := tmp
@@ -7220,6 +7386,10 @@ STATIC FUNCTION __hbmk( aArgs, nArgTarget, nLevel, /* @ */ lPause, /* @ */ lExit
 
                /* Handle moving the whole command-line to a script, if requested. */
                IF Empty( cScriptFile ) .AND. "{SCRIPT}" $ cOpt_Dyn
+                  IF "{ESCAPE_BS}" $ cOpt_Dyn
+                     cOpt_Dyn := StrTran( cOpt_Dyn, "{ESCAPE_BS}" )
+                     cOpt_Dyn := StrTran( cOpt_Dyn, "\", "\\" )
+                  ENDIF
                   fhnd := hb_FTempCreateEx( @cScriptFile, NIL, NIL, ".lnk" )
                   IF fhnd != F_ERROR
                      FWrite( fhnd, StrTran( cOpt_Dyn, "{SCRIPT}" ) )
@@ -7910,7 +8080,7 @@ STATIC PROCEDURE Set_lCreateDyn( hbmk, lValue )
 STATIC FUNCTION gcc_opt_lngc_fill( hbmk )
 
    DO CASE
-   CASE HBMK_ISCOMP( "gcc|gccarm|gccomf|mingw|mingw64|mingwarm|djgpp|icc|icc64|clang|clang64" )
+   CASE HBMK_ISCOMP( "gcc|gccarm|gccomf|mingw|mingw64|mingwarm|djgpp|icc|icc64|clang|clang64|zig" )
 
       SWITCH hbmk[ _HBMK_cC ]
       CASE "iso90" ; RETURN "-std=c89" /* aka c89, aka ansi */
@@ -7928,7 +8098,7 @@ STATIC FUNCTION gcc_opt_lngc_fill( hbmk )
 STATIC FUNCTION gcc_opt_lngcpp_fill( hbmk )
 
    DO CASE
-   CASE HBMK_ISCOMP( "gcc|gccarm|gccomf|mingw|mingw64|mingwarm|djgpp|clang|clang64" )
+   CASE HBMK_ISCOMP( "gcc|gccarm|gccomf|mingw|mingw64|mingwarm|djgpp|clang|clang64|zig" )
 
       SWITCH hbmk[ _HBMK_cCPP ]
       CASE "iso98" ; RETURN "-std=c++98" /* ~aka c++03, ~aka ansi */
@@ -8389,7 +8559,7 @@ STATIC FUNCTION FindNewerHeaders( hbmk, cFileName, tTimeParent, lCMode, cBin_Com
    cExt := Lower( hb_FNameExt( cFileName ) )
 
    /* Filter out non-source format inputs for MinGW / windres */
-   IF HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|clang" ) .AND. HBMK_ISPLAT( "win|wce" ) .AND. cExt == ".res"
+   IF HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|clang|zig" ) .AND. HBMK_ISPLAT( "win|wce" ) .AND. cExt == ".res"
       RETURN .F.
    ENDIF
 
@@ -8423,7 +8593,7 @@ STATIC FUNCTION FindNewerHeaders( hbmk, cFileName, tTimeParent, lCMode, cBin_Com
          IF ! Empty( cModule )
             FOR EACH cDependency IN hb_ATokens( cModule, " " )
                IF ( cDependency:__enumIndex() > 1 .OR. ; /* Skip own (module) name */
-                    ( LEFTEQUAL( cFileName, "@" ) .AND. cExt == ".clp" ) ) .AND. ;
+                    ( hb_LeftEq( cFileName, "@" ) .AND. cExt == ".clp" ) ) .AND. ;
                     ! Empty( cDependency )
                   IF hbmk[ _HBMK_lDEBUGINC ]
                      _hbmk_OutStd( hbmk, hb_StrFormat( "debuginc: HEADER (NATIVE) %1$s", cDependency ) )
@@ -8442,7 +8612,7 @@ STATIC FUNCTION FindNewerHeaders( hbmk, cFileName, tTimeParent, lCMode, cBin_Com
          ENDIF
       NEXT
 
-   ELSEIF lCMode .AND. hbmk[ _HBMK_nHEAD ] == _HEAD_NATIVE .AND. HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|djgpp|gccomf|clang|open64" )
+   ELSEIF lCMode .AND. hbmk[ _HBMK_nHEAD ] == _HEAD_NATIVE .AND. HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|djgpp|gccomf|clang|open64|zig" )
 
       IF hbmk[ _HBMK_lDEBUGINC ]
          _hbmk_OutStd( hbmk, hb_StrFormat( "debuginc: Calling C/C++ compiler to detect dependencies of %1$s", cFileName ) )
@@ -8476,7 +8646,7 @@ STATIC FUNCTION FindNewerHeaders( hbmk, cFileName, tTimeParent, lCMode, cBin_Com
          ENDIF
       NEXT
    ELSE
-      IF ! lCMode .AND. LEFTEQUAL( cFileName, "@" ) .AND. cExt == ".clp"
+      IF ! lCMode .AND. hb_LeftEq( cFileName, "@" ) .AND. cExt == ".clp"
          FOR EACH cDependency IN clpfile_read( SubStr( cFileName, 2 ) )
             IF ! Empty( cDependency )
                IF hbmk[ _HBMK_lDEBUGINC ]
@@ -9074,7 +9244,9 @@ STATIC FUNCTION dep_evaluate( hbmk )
             IF hbmk[ _HBMK_lInfo ]
                _hbmk_OutStd( hbmk, hb_StrFormat( I_( "Dependency '%1$s' forcibly disabled" ), dep[ _HBMKDEP_cName ] ) )
             ENDIF
-            lAnyForcedOut := .T.
+            IF ! dep[ _HBMKDEP_lOptional ]
+               lAnyForcedOut := .T.
+            ENDIF
             LOOP
          ELSE
             IF hbmk[ _HBMK_lDEBUGDEPD ]
@@ -9396,7 +9568,7 @@ STATIC FUNCTION FindLib( hbmk, cLib, aLIBPATH, cLibPrefix, cLibExt )
    LOCAL tmp
 
    /* Check libs in their full paths */
-   IF HBMK_ISCOMP( "msvc|msvc64|msvcarm|bcc|bcc64|pocc|pocc64|poccarm|watcom" )
+   IF HBMK_ISCOMP( "msvc|msvc64|msvcarm|msvcarm64|bcc|bcc64|pocc|pocc64|poccarm|watcom" )
       IF ! Empty( hb_FNameDir( cLib ) )
          IF hb_FileExists( cLib := hb_FNameExtSet( cLib, cLibExt ) )
             RETURN cLib
@@ -9411,7 +9583,7 @@ STATIC FUNCTION FindLib( hbmk, cLib, aLIBPATH, cLibPrefix, cLibExt )
    ENDIF
 
    /* Check in current dir */
-   IF HBMK_ISCOMP( "msvc|msvc64|msvcarm|bcc|bcc64|pocc|pocc64|poccarm|watcom" )
+   IF HBMK_ISCOMP( "msvc|msvc64|msvcarm|msvcarm64|bcc|bcc64|pocc|pocc64|poccarm|watcom" )
       IF ! Empty( tmp := LibExists( hbmk, "", cLib, cLibPrefix, cLibExt ) )
          RETURN tmp
       ENDIF
@@ -9428,7 +9600,7 @@ STATIC FUNCTION FindLib( hbmk, cLib, aLIBPATH, cLibPrefix, cLibExt )
 
 #if 0
    /* Check in certain other compiler specific locations. */
-   IF HBMK_ISCOMP( "msvc|msvc64|msvcarm" )
+   IF HBMK_ISCOMP( "msvc|msvc64|msvcarm|msvcarm64" )
       FOR EACH cDir IN hb_ATokens( GetEnv( "LIB" ), hb_osPathListSeparator(), .T., .T. )
          IF ! Empty( cDir )
             IF ! Empty( tmp := LibExists( hbmk, cDir, cLib, cLibPrefix, cLibExt ) )
@@ -9448,7 +9620,7 @@ STATIC FUNCTION LibExists( hbmk, cDir, cLib, cLibPrefix, cLibExt )
    cDir := hb_DirSepAdd( hb_DirSepToOS( cDir ) )
 
    DO CASE
-   CASE HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|clang" ) .AND. HBMK_ISPLAT( "win|wce|cygwin" )
+   CASE HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|clang|zig" ) .AND. HBMK_ISPLAT( "win|wce|cygwin" )
       /* NOTE: ld/gcc option -dll-search-prefix is not taken into account here,
                So, '<prefix>xxx.dll' format libs will not be found here in any case. */
       DO CASE
@@ -9808,6 +9980,7 @@ STATIC FUNCTION PlugIn_make_ctx( hbmk, cState, hVars )
       "cSTATE"        => cState                     , ;
       "params"        => hbmk[ _HBMK_aPLUGINPars ]  , ;
       "vars"          => hVars                      , ;
+      "dept"          => hbmk[ _HBMK_hDEPTMACRO ]   , ;
       "cPLAT"         => hbmk[ _HBMK_cPLAT ]        , ;
       "cCOMP"         => hbmk[ _HBMK_cCOMP ]        , ;
       "nCOMPVer"      => hbmk[ _HBMK_nCOMPVer ]     , ;
@@ -10174,7 +10347,7 @@ STATIC FUNCTION ListCookLib( hbmk, aLIB, aLIBA, array, cPrefix, cExtNew )
    LOCAL cLibNameCooked
    LOCAL cName, cExt
 
-   IF HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|djgpp|gccomf|clang|open64" )
+   IF HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|djgpp|gccomf|clang|open64|zig" )
       FOR EACH cLibName IN array
          hb_FNameSplit( cLibName, @cDir )
          IF Empty( cDir )
@@ -10309,7 +10482,7 @@ STATIC FUNCTION PathSepToTarget( hbmk, cFileName, nStart )
 
    hb_default( @nStart, 1 )
 
-   IF HBMK_ISPLAT( "win|wce|dos|os2" ) .AND. ! HBMK_ISCOMP( "mingw|mingw64|mingwarm|clang" )
+   IF HBMK_ISPLAT( "win|wce|dos|os2" ) .AND. ! HBMK_ISCOMP( "mingw|mingw64|mingwarm|clang|zig" )
       RETURN Left( cFileName, nStart - 1 ) + StrTran( SubStr( cFileName, nStart ), "/", "\" )
    ENDIF
 
@@ -10537,7 +10710,7 @@ STATIC FUNCTION EnvNotation( cEnvName )
    RETURN "$" + cEnvName
 #endif
 
-#define SELF_NAME() iif( hbmk[ _HBMK_lShellMode ], iif( hb_FNameName( hb_ProgName() ) == _SELF_NAME_, "hbrun", hb_FNameName( hb_ProgName() ) ), _SELF_NAME_ )
+#define SELF_NAME() iif( hbmk[ _HBMK_lShellMode ], iif( hb_FNameName( hbmk_hb_ProgName() ) == _SELF_NAME_, "hbrun", hb_FNameName( hbmk_hb_ProgName() ) ), _SELF_NAME_ )
 
 STATIC FUNCTION AutoConfPathList( hbmk, lCWD, lForDocOutput )
 
@@ -10686,7 +10859,7 @@ STATIC FUNCTION HBC_ProcessOne( hbmk, cFileName, nNestingLevel )
                   NEXT
                CASE hb_FNameExt( cItemL ) == ".res"
                   IF HBMK_ISCOMP( "mingw|mingw64|mingwarm" ) .OR. ;
-                     ( hbmk[ _HBMK_cPLAT ] == "win" .AND. HBMK_ISCOMP( "clang" ) ) .OR. ;
+                     ( hbmk[ _HBMK_cPLAT ] == "win" .AND. HBMK_ISCOMP( "clang|zig" ) ) .OR. ;
                      ( hbmk[ _HBMK_cPLAT ] == "os2" .AND. HBMK_ISCOMP( "gcc|gccomf" ) )
                      /* For MinGW/EMX GCC family add .res files as source input, as they
                         will need to be converted to coff format with windres (just
@@ -11362,7 +11535,7 @@ STATIC FUNCTION hbmk_builtin_Is( cFileName )
 
    cFileName := hb_FNameNameExt( cFileName )
 
-   RETURN LEFTEQUAL( cFileName, _HBMK_BUILTIN_FILENAME_MARKER_ ) .AND. ;
+   RETURN hb_LeftEq( cFileName, _HBMK_BUILTIN_FILENAME_MARKER_ ) .AND. ;
       Len( cFileName ) > Len( _HBMK_BUILTIN_FILENAME_MARKER_ )
 
 STATIC FUNCTION hbmk_builtin_Exists( cFileName )
@@ -11844,12 +12017,12 @@ STATIC FUNCTION getFirstFunc( hbmk, cFile )
    LOCAL cFuncList, cExecNM, cFuncName, cExt, cLine, n, c
 
    cFuncName := ""
-   IF HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|gccomf|clang" )
+   IF HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|gccomf|clang|zig" )
       hb_FNameSplit( cFile,,, @cExt )
       IF cExt == ".c"
          FOR EACH cLine IN hb_ATokens( StrTran( hb_MemoRead( cFile ), Chr( 13 ), Chr( 10 ) ), Chr( 10 ) )
             cLine := AllTrim( cLine )
-            IF LEFTEQUAL( cLine, '{ "' ) .AND. "HB_FS_FIRST" $ cLine .AND. !( "HB_FS_STATIC" $ cLine )
+            IF hb_LeftEq( cLine, '{ "' ) .AND. "HB_FS_FIRST" $ cLine .AND. !( "HB_FS_STATIC" $ cLine )
                n := 4
                WHILE ( c := SubStr( cLine, n++, 1 ) ) != '"'
                   cFuncName += c
@@ -11893,6 +12066,9 @@ STATIC PROCEDURE PlatformPRGFlags( hbmk, aOPTPRG )
    LOCAL aDf
    LOCAL cMacro
    LOCAL nPos
+
+   /* NOTE: hbmk2 mangles platform definitions here when cross-compiling,
+      otherwise and typically these are defined by hbpp, see ppcore.c */
 
    IF ! hbmk[ _HBMK_cPLAT ] == hb_Version( HB_VERSION_BUILD_PLAT ) .OR. ;
       ! hbmk[ _HBMK_cCOMP ] == hb_Version( HB_VERSION_BUILD_COMP )
@@ -12014,6 +12190,10 @@ STATIC PROCEDURE PlatformPRGFlags( hbmk, aOPTPRG )
       CASE hbmk[ _HBMK_cPLAT ] == "aix"
          AAdd( aDf, "__PLATFORM__AIX" )
          AAdd( aDf, "__PLATFORM__UNIX" )
+      CASE hbmk[ _HBMK_cPLAT ] == "wasm"
+         AAdd( aDf, "__PLATFORM__UNIX" )
+         AAdd( aDf, "__PLATFORM__WASM" )
+         AAdd( aDf, "__PLATFORM__ABSTRACT" )
       ENDCASE
 
       /* Setup those CPU flags which we can be sure about.
@@ -12029,9 +12209,11 @@ STATIC PROCEDURE PlatformPRGFlags( hbmk, aOPTPRG )
          AAdd( aDf, "__LITTLE_ENDIAN__" ) /* Windows is currently little-endian on all supported CPUs. */
          IF hbmk[ _HBMK_cCOMP ] == "mingw64" .OR. ;
             hbmk[ _HBMK_cCOMP ] == "msvc64" .OR. ;
+            hbmk[ _HBMK_cCOMP ] == "msvcarm64" .OR. ;
             hbmk[ _HBMK_cCOMP ] == "pocc64" .OR. ;
             hbmk[ _HBMK_cCOMP ] == "msvcia64" .OR. ;
-            hbmk[ _HBMK_cCOMP ] == "iccia64"
+            hbmk[ _HBMK_cCOMP ] == "iccia64" .OR. ;
+            hb_RightEq( hbmk[ _HBMK_cCPU ], "64" )
             AAdd( aDf, "__ARCH64BIT__" )
          ELSE
             AAdd( aDf, "__ARCH32BIT__" )
@@ -12041,7 +12223,12 @@ STATIC PROCEDURE PlatformPRGFlags( hbmk, aOPTPRG )
                   given platform + compiler settings. We could only guess.
                   Let us assume the most probable CPU platform (as of 2009). */
          AAdd( aDf, "__LITTLE_ENDIAN__" )
-         AAdd( aDf, "__ARCH32BIT__" )
+         IF hb_RightEq( hbmk[ _HBMK_cCPU ], "64" ) .OR. ;
+            hbmk[ _HBMK_cCPU ] == "alpha"
+            AAdd( aDf, "__ARCH64BIT__" )
+         ELSE
+            AAdd( aDf, "__ARCH32BIT__" )
+         ENDIF
       ENDCASE
 
       /* Delete macros present in both lists */
@@ -12230,7 +12417,7 @@ STATIC FUNCTION rtlnk_process( hbmk, cCommands, cFileOut, aFileList, ;
       IF ! Empty( cLine )
          FOR EACH cWord IN rtlnk_tokens( cLine )
             DO CASE
-            CASE LEFTEQUAL( cWord, "#" )
+            CASE hb_LeftEq( cWord, "#" )
                EXIT
             CASE nMode == RTLNK_MODE_OUT
                cFileOut := hb_DirSepToOS( cWord )
@@ -12266,7 +12453,7 @@ STATIC FUNCTION rtlnk_process( hbmk, cCommands, cFileOut, aFileList, ;
                CASE nMode == RTLNK_MODE_SKIPNEXT
                   nMode := RTLNK_MODE_SKIP
                ENDCASE
-            CASE LEFTEQUAL( cWord, "@" )
+            CASE hb_LeftEq( cWord, "@" )
                cWord := SubStr( cWord, 2 )
                cCommands := rtlnk_read( @cWord, aPrevFiles )
                IF cCommands == NIL
@@ -12280,28 +12467,28 @@ STATIC FUNCTION rtlnk_process( hbmk, cCommands, cFileOut, aFileList, ;
                cWord := Upper( cWord )
                IF Len( cWord ) >= 2
                   DO CASE
-                  CASE LEFTEQUAL( "OUTPUT", cWord )
+                  CASE hb_LeftEq( "OUTPUT", cWord )
                      nMode := RTLNK_MODE_OUT
-                  CASE LEFTEQUAL( "FILE", cWord )
+                  CASE hb_LeftEq( "FILE", cWord )
                      nMode := RTLNK_MODE_FILE
-                  CASE LEFTEQUAL( "LIBRARY", cWord )
+                  CASE hb_LeftEq( "LIBRARY", cWord )
                      nMode := RTLNK_MODE_LIB
-                  CASE LEFTEQUAL( "MODULE", cWord ) .OR. ;
-                       LEFTEQUAL( "EXCLUDE", cWord ) .OR. ;
-                       LEFTEQUAL( "REFER", cWord ) .OR. ;
-                       LEFTEQUAL( "INTO", cWord )
+                  CASE hb_LeftEq( "MODULE", cWord ) .OR. ;
+                       hb_LeftEq( "EXCLUDE", cWord ) .OR. ;
+                       hb_LeftEq( "REFER", cWord ) .OR. ;
+                       hb_LeftEq( "INTO", cWord )
                      nMode := RTLNK_MODE_SKIP
                   /* Blinker extension */
-                  CASE LEFTEQUAL( "BLINKER", cWord )
+                  CASE hb_LeftEq( "BLINKER", cWord )
                      /* skip Blinker commands */
                      EXIT
-                  CASE LEFTEQUAL( "ECHO", cWord )
+                  CASE hb_LeftEq( "ECHO", cWord )
                      _hbmk_OutStd( hbmk, hb_StrFormat( I_( "Blinker ECHO: %1$s" ), SubStr( cLine, 6 ) ) )
                      EXIT
-                  CASE LEFTEQUAL( "MAP", cWord )
+                  CASE hb_LeftEq( "MAP", cWord )
                      hbmk[ _HBMK_lMAP ] := .T.
                      EXIT
-                  CASE LEFTEQUAL( "NOBELL", cWord )
+                  CASE hb_LeftEq( "NOBELL", cWord )
                      hbmk[ _HBMK_lBEEP ] := .F.
                      EXIT
                   OTHERWISE /* TODO: add other Blinker commands */
@@ -12646,7 +12833,7 @@ STATIC FUNCTION win_implib_omf( hbmk, cSourceDLL, cTargetLib )
 
    LOCAL cSourceLib
 
-   /* Try to find COFF .lib with the same name */
+   /* Try to find OMF .lib with the same name */
    IF hb_FileExists( cSourceLib := hb_FNameExtSet( cSourceDLL, ".lib" ) )
       IF IsOMFLib( cSourceLib )
          IF ! hbmk[ _HBMK_lQuiet ]
@@ -13034,6 +13221,8 @@ STATIC FUNCTION hbmk_CPU( hbmk )
         hbmk[ _HBMK_cCOMP ] == "msvcarm" .OR. ;
         hbmk[ _HBMK_cCOMP ] == "poccarm"
       RETURN "arm"
+   CASE hbmk[ _HBMK_cCOMP ] == "msvcarm64"
+      RETURN "arm64"
    CASE hbmk[ _HBMK_cCOMP ] == "msvcmips"
       RETURN "mips"
    CASE hbmk[ _HBMK_cCOMP ] == "msvcsh"
@@ -13086,10 +13275,11 @@ FUNCTION hbmk_KEYW( hbmk, cFileName, cKeyword, cValue, cOperator )
    CASE "winuni"   ; RETURN hbmk[ _HBMK_lWINUNI ]
    CASE "winansi"  ; RETURN ! hbmk[ _HBMK_lWINUNI ]
    CASE "unix"     ; RETURN HBMK_ISPLAT( "bsd|hpux|sunos|beos|qnx|android|vxworks|symbian|linux|darwin|cygwin|minix|aix" )
+   CASE "abstr"    ; RETURN HBMK_ISPLAT( "wasm|wasi" )
    CASE "allwin"   ; RETURN HBMK_ISPLAT( "win|wce" )
    CASE "allgcc"   ; RETURN HBMK_ISCOMP( "gcc|mingw|mingw64|mingwarm|djgpp|gccomf|clang|open64|pcc" )
    CASE "allmingw" ; RETURN HBMK_ISCOMP( "mingw|mingw64|mingwarm" )
-   CASE "allmsvc"  ; RETURN HBMK_ISCOMP( "msvc|msvc64|msvcia64|msvcarm" )
+   CASE "allmsvc"  ; RETURN HBMK_ISCOMP( "msvc|msvc64|msvcia64|msvcarm|msvcarm64" )
    CASE "allbcc"   ; RETURN HBMK_ISCOMP( "bcc|bcc64" )
    CASE "allpocc"  ; RETURN HBMK_ISCOMP( "pocc|pocc64|poccarm" )
    CASE "allicc"   ; RETURN HBMK_ISCOMP( "icc|iccia64" )
@@ -13110,13 +13300,13 @@ FUNCTION hbmk_KEYW( hbmk, cFileName, cKeyword, cValue, cOperator )
    IF ! HBMK_IS_IN( cKeyword, ;
       "|win|wce|dos|os2" + ;
       "|bsd|hpux|sunos|beos|qnx|android|vxworks|symbian|linux|darwin|cygwin|minix|aix" + ;
-      "|msvc|msvc64|msvcia64|msvcarm" + ;
-      "|pocc|pocc64|poccarm|xcc|tcc" + ;
+      "|msvc|msvc64|msvcia64|msvcarm|msvcarm64" + ;
+      "|pocc|pocc64|poccarm|xcc|tcc|zig" + ;
       "|mingw|mingw64|mingwarm|bcc|bcc64|watcom" + ;
       "|gcc|gccomf|djgpp" + ;
       "|hblib|hbdyn|hbdynvm|hbimplib|hbexe" + ;
       "|icc|iccia64|clang|open64|sunpro|diab|pcc" + ;
-      "|x86|x86_64|ia64|arm|mips|sh" )
+      "|x86|x86_64|ia64|arm|arm64|mips|sh" )
 
       /* handle pseudo-functions */
       IF cOperator == "=" .AND. cValue != NIL
@@ -13851,7 +14041,7 @@ STATIC PROCEDURE __hbshell( cFile, ... )
    /* Save originals */
 
    hbsh[ _HBSH_cDirBase ] := hb_DirBase()
-   hbsh[ _HBSH_cProgName ] := hb_ProgName()
+   hbsh[ _HBSH_cProgName ] := hbmk_hb_ProgName()
 
    /* Init */
 
@@ -14024,7 +14214,7 @@ STATIC PROCEDURE __hbshell( cFile, ... )
          /* We can use this function as this is a GPL licenced application */
          cFile := hb_compileBuf( ;
             hbmk_CoreHeaderFiles(), ;
-            hb_ProgName(), ;
+            hbmk_hb_ProgName(), ;
             "-n2", "-w", "-es2", "-q0", ;
             hb_ArrayToParams( aOPTPRG ), ;
             "-D" + _HBMK_SHELL, ;
@@ -14159,7 +14349,7 @@ STATIC PROCEDURE __hbshell_ext_static_init()
    nCount := __dynsCount()
    FOR tmp := 1 TO nCount
       cName := __dynsGetName( tmp )
-      IF LEFTEQUAL( cName, "__HBEXTERN__" ) .AND. ;
+      IF hb_LeftEq( cName, "__HBEXTERN__" ) .AND. ;
          ! HBMK_IS_IN( cName, "__HBEXTERN__HBCPAGE__" )
          hbsh[ _HBSH_hLibExt ][ Lower( SubStr( cName, Len( "__HBEXTERN__" ) + 1, Len( cName ) - Len( "__HBEXTERN__" ) - Len( "__" ) ) ) ] := NIL
       ENDIF
@@ -14397,7 +14587,7 @@ STATIC FUNCTION __hbshell_plugins_load( hPlugins, aParams )
 
       IF ! Lower( hb_FNameExt( cFile:__enumKey() ) ) == ".hrb"
          /* We can use this function as this is a GPL licensed application */
-         cFile := hb_compileFromBuf( cFile, hbmk_CoreHeaderFiles(), hb_ProgName(), "-n2", "-w", "-es2", "-q0" )
+         cFile := hb_compileFromBuf( cFile, hbmk_CoreHeaderFiles(), hbmk_hb_ProgName(), "-n2", "-w", "-es2", "-q0" )
       ENDIF
 
       IF ! Empty( cFile )
@@ -14787,7 +14977,7 @@ STATIC PROCEDURE __hbshell_Exec( cCommand )
    BEGIN SEQUENCE WITH {| oError | __hbshell_Err( oError, cCommand ) }
 
       /* We can use this function as this is a GPL licensed application */
-      cHRB := hb_compileFromBuf( cFunc, hbmk_CoreHeaderFiles(), hb_ProgName(), "-n2", "-q2", hb_ArrayToParams( aOPTPRG ) )
+      cHRB := hb_compileFromBuf( cFunc, hbmk_CoreHeaderFiles(), hbmk_hb_ProgName(), "-n2", "-q2", hb_ArrayToParams( aOPTPRG ) )
       IF Empty( cHRB )
          Eval( ErrorBlock(), I_( "Syntax error." ) )
       ELSE
@@ -15032,7 +15222,7 @@ STATIC FUNCTION __hbshell_TryHeader( cName )
 
    BEGIN SEQUENCE WITH __BreakBlock()
 
-      IF ! Empty( hb_compileFromBuf( "", hbmk_CoreHeaderFiles(), hb_ProgName(), "-q2", ;
+      IF ! Empty( hb_compileFromBuf( "", hbmk_CoreHeaderFiles(), hbmk_hb_ProgName(), "-q2", ;
                                      "-i" + hbsh[ _HBSH_hbmk ][ _HBMK_cHB_INSTALL_INC ], ;
                                      "-u+" + cName ) )
          lRetVal := .T.
@@ -15136,7 +15326,7 @@ STATIC FUNCTION __hbshell_gtDefault()
    RETURN "GTDOS"
 #elif defined( __PLATFORM__OS2 )
    RETURN "GTOS2"
-#elif defined( __PLATFORM__UNIX ) .AND. ! defined( __PLATFORM__VXWORKS ) .AND. ! defined( __PLATFORM__SYMBIAN )
+#elif defined( __PLATFORM__UNIX ) .AND. ! defined( __PLATFORM__WASM ) .AND. ! defined( __PLATFORM__VXWORKS ) .AND. ! defined( __PLATFORM__SYMBIAN )
    RETURN "GTTRM"
 #else
    RETURN _HBMK_GT_DEF_
@@ -15795,7 +15985,7 @@ STATIC PROCEDURE ShowHelp( hbmk, lMore, lLong )
       "", ;
       "  " + hb_StrFormat( I_( "%1$s [options] [<script[s]>] <src[s][.prg|.c|.obj|.o|.rc|.res|.def|.po|.pot|.hbl|@.clp|.d|.ch]>" ), _SELF_NAME_ ) }
 
-   LOCAL cShell := iif( hb_FNameName( hb_ProgName() ) == _SELF_NAME_, "hbrun", hb_FNameName( hb_ProgName() ) )
+   LOCAL cShell := iif( hb_FNameName( hbmk_hb_ProgName() ) == _SELF_NAME_, "hbrun", hb_FNameName( hbmk_hb_ProgName() ) )
 
    LOCAL aHdr_Syntax_Shell := { ;
       I_( "Syntax:" ), ;
@@ -15808,13 +15998,13 @@ STATIC PROCEDURE ShowHelp( hbmk, lMore, lLong )
 
    LOCAL aLst_Supp := { ;
       , ;
-      { "linux"   , "gcc, clang, icc, watcom, sunpro, open64" }, ;
-      { "darwin"  , "gcc, clang, icc" }, ;
-      { "win"     , "mingw, msvc, clang, bcc, bcc64, watcom, icc, pocc, xcc, mingw64, msvc64, msvcia64, iccia64, pocc64" }, ;
+      { "linux"   , "gcc, clang, icc, watcom, sunpro, open64, zig" }, ;
+      { "darwin"  , "gcc, clang, icc, zig" }, ;
+      { "win"     , "mingw, msvc, clang, bcc, bcc64, watcom, icc, pocc, xcc, mingw64, msvc64, msvcarm, msvcarm64, msvcia64, iccia64, pocc64, zig" }, ;
       { "wce"     , "mingwarm, mingw, msvcarm, poccarm" }, ;
       { "os2"     , "gcc, gccomf, watcom" }, ;
       { "dos"     , "djgpp, watcom" }, ;
-      { "bsd"     , "gcc, clang, pcc" }, ;
+      { "bsd"     , "gcc, clang, pcc, zig" }, ;
       { "hpux"    , "gcc" }, ;
       { "beos"    , "gcc" }, ;
       { "qnx"     , "gcc" }, ;
@@ -16202,7 +16392,7 @@ STATIC PROCEDURE ShowHelp( hbmk, lMore, lLong )
       { "{allwin}"                , I_( "target platform is Windows compatible (win, wce)" ) }, ;
       { "{allgcc}"                , I_( "target C compiler belongs to gcc family (gcc, mingw, mingw64, mingwarm, djgpp, gccomf, clang, open64, pcc)" ) }, ;
       { "{allmingw}"              , I_( "target C compiler is mingw* (mingw, mingw64, mingwarm)" ) }, ;
-      { "{allmsvc}"               , I_( "target C compiler is msvc* (msvc, msvc64, msvcia64, msvcarm)" ) }, ;
+      { "{allmsvc}"               , I_( "target C compiler is msvc* (msvc, msvc64, msvcia64, msvcarm, msvcarm64)" ) }, ;
       { "{allbcc}"                , I_( "target C compiler is bcc* (bcc, bcc64)" ) }, ;
       { "{allpocc}"               , I_( "target C compiler is pocc* (pocc, pocc64, poccarm)" ) }, ;
       { "{allicc}"                , I_( "target C compiler is icc* (icc, iccia64)" ) }, ;
@@ -16882,6 +17072,13 @@ STATIC FUNCTION _hbmk_TargetName( hbmk )
    ENDIF
 
    RETURN cName
+
+STATIC FUNCTION hbmk_hb_ProgName()
+#if defined( HBMK_PROGNAME )
+   RETURN _HBMK_STRINGIFY( HBMK_PROGNAME )
+#else
+   RETURN hb_ProgName()
+#endif
 
 STATIC FUNCTION LicenseString()
 #pragma __cstream | RETURN %s
